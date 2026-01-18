@@ -5,10 +5,10 @@ if not AB_Track then AB_Track = {} end
 if not AB_LastPrint then AB_LastPrint = 0 end
 
 function AutoWarriorBuffs(m)
-    local tm, th = GetTime(), (m or 2) * 60
+    local tm, th = GetTime(), (tonumber(m) or 2) * 60
     local S = { "Battle Shout" }
     local T = { "BattleShout" }
-    local D = { 120 }    -- 2 Minutes
+    local D = { 120 }      -- 2 Minutes
     local U = { "player" } -- Battle Shout is AoE, checking player is sufficient tracking
 
     local av = { false }

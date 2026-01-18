@@ -5,7 +5,7 @@ if not AB_Track then AB_Track = {} end
 if not AB_LastPrint then AB_LastPrint = 0 end
 
 function AutoPaladinBuffs(m)
-    local tm, th = GetTime(), (m or 5) * 60
+    local tm, th = GetTime(), (tonumber(m) or 5) * 60
     local S = { "Blessing of Kings", "Blessing of Wisdom", "Blessing of Might" }
     local T = { "Magic_MageArmor", "Holy_SealOfWisdom", "Holy_FistOfJustice" } -- Textures need strict verification
     -- Kings: Spell_Magic_MageArmor? Or Spell_Magic_GreaterBlessingofKings

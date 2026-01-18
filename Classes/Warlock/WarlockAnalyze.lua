@@ -91,7 +91,11 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
     -- 2. DOTS
     for x, s in ipairs(DoTs) do
         local k = n .. Tex[x]
-        local tmr = (WD_Track[k] and (tm - WD_Track[k]) < (Dur[x] - 2))
+        local last = WD_Track[k] or 0
+        local elapsed = tm - last
+
+        -- Timer check (is it theoretically up?)
+        local tmr = (last > 0 and elapsed < (Dur[x] - 2))
 
         -- Check Visual Debuff on Unit (to fix Identity issues)
         local hasDot = false
@@ -103,6 +107,9 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
                 break
             end
         end
+
+        -- LATENCY FIX: If we cast it < 3s ago, assume it's up even if visual is missing
+        if last > 0 and elapsed < 3 then hasDot = true end
 
         if not tmr or (tmr and not hasDot) then
             local dotScore = (prio >= 2 and 80 or 20)

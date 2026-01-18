@@ -5,7 +5,7 @@ if not AB_Track then AB_Track = {} end
 if not AB_LastPrint then AB_LastPrint = 0 end
 
 function AutoWarlockBuffs(m)
-    local tm, th = GetTime(), (m or 5) * 60
+    local tm, th = GetTime(), (tonumber(m) or 5) * 60
     local S = { "Demon Armor", "Demon Skin", "Unending Breath", "Detect Greater Invisibility" }
     local T = { "RagingScream", "RagingScream", "Shadow_DemonBreath", "Shadow_DetectInvisibility" } -- Textures need verification
     local D = { 1800, 1800, 600, 600 }

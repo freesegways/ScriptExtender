@@ -5,11 +5,11 @@ if not AB_Track then AB_Track = {} end
 if not AB_LastPrint then AB_LastPrint = 0 end
 
 function AutoDruidBuffs(m)
-    local tm, th = GetTime(), (m or 5) * 60
+    local tm, th = GetTime(), (tonumber(m) or 5) * 60
     local S = { "Mark of the Wild", "Thorns", "Omen of Clarity" }
     local T = { "Regeneration", "Thorns", "CrystalBall" } -- Textures: Spell_Nature_Regeneration, Spell_Nature_Thorns
     local D = { 1800, 600, 600 }
-    local W = { 5, 3, 2 }                               -- Priorities: Mark > Thorns > Omen
+    local W = { 5, 3, 2 }                                 -- Priorities: Mark > Thorns > Omen
     local U = { "player", "target", "party1", "party2", "party3", "party4" }
 
     -- 1. Check Spell Availability

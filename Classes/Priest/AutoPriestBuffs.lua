@@ -5,7 +5,7 @@ if not AB_Track then AB_Track = {} end
 if not AB_LastPrint then AB_LastPrint = 0 end
 
 function AutoPriestBuffs(m)
-    local tm, th = GetTime(), (m or 5) * 60
+    local tm, th = GetTime(), (tonumber(m) or 5) * 60
     local S = { "Power Word: Fortitude", "Divine Spirit", "Inner Fire", "Fear Ward" }
     local T = { "Fortitude", "Spirit", "InnerFire", "Excorcism" }
     local D = { 1800, 1800, 600, 600 }
@@ -69,7 +69,7 @@ function AutoPriestBuffs(m)
     for _, u in ipairs(U) do
         if UnitExists(u) and not UnitIsDeadOrGhost(u) and UnitIsConnected(u) and UnitIsFriend("player", u) then
             local safe = UnitInParty(u) or u == "player" or (not UnitIsPVP("player") and not UnitIsPVP(u)) or
-            UnitIsPVP("player")
+                UnitIsPVP("player")
             if safe then
                 for id = 1, 4 do
                     local ok = false

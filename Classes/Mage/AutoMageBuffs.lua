@@ -5,7 +5,7 @@ if not AB_Track then AB_Track = {} end
 if not AB_LastPrint then AB_LastPrint = 0 end
 
 function AutoMageBuffs(m)
-    local tm, th = GetTime(), (m or 5) * 60
+    local tm, th = GetTime(), (tonumber(m) or 5) * 60
     local S = { "Arcane Intellect", "Ice Armor", "Mage Armor", "Dampen Magic" } -- Extended as needed
     local T = { "MagicalSentry", "FrostArmor", "MageArmor", "DampenMagic" }
     local D = { 1800, 1800, 1800, 600 }
@@ -72,17 +72,17 @@ function AutoMageBuffs(m)
     for _, u in ipairs(U) do
         if UnitExists(u) and not UnitIsDeadOrGhost(u) and UnitIsConnected(u) and UnitIsFriend("player", u) then
             local safe = UnitInParty(u) or u == "player" or (not UnitIsPVP("player") and not UnitIsPVP(u)) or
-            UnitIsPVP("player")
+                UnitIsPVP("player")
             if safe then
                 for id = 1, 4 do
                     local ok = false
                     if id == 1 then
-                        if av[1] and UnitPowerType(u) == 0 then ok = true end             -- AI only for mana users
+                        if av[1] and UnitPowerType(u) == 0 then ok = true end -- AI only for mana users
                     elseif id == 2 or id == 3 then
-                        if u == "player" and av[id] then ok = true end                    -- Armor self only
+                        if u == "player" and av[id] then ok = true end        -- Armor self only
                     elseif id == 4 then
                         if av[4] then ok = false end
-                    end                                                                   -- Dampen Magic logic is complex, skipping for basic auto
+                    end -- Dampen Magic logic is complex, skipping for basic auto
 
                     if ok then
                         local inRange = (u == "player" or CheckInteractDistance(u, 4))
