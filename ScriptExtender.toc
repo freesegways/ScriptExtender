@@ -50,12 +50,27 @@ Healing\SmartCancel.lua
 Healing\SmartCancel.test.lua
 Healing\SmartCleanse.lua
 Healing\SmartCleanse.test.lua
+Healing\SmartRes.lua
+Healing\SmartRes.test.lua
 
 Classes\Paladin\PaladinTest.lua
 Classes\Priest\GetHealProfile.lua
 Classes\Priest\GetHealProfile.test.lua
+Classes\Priest\AutoPriestBuffs.lua
+
+Classes\Mage\AutoMageBuffs.lua
+
 Classes\Warlock\DeleteExcessShards.lua
 Classes\Warlock\DeleteExcessShards.test.lua
+Classes\Warlock\AutoWarlockBuffs.lua
+
+Classes\Druid\AutoDruidBuffs.lua
+
+Classes\Warrior\AutoWarriorBuffs.lua
+Classes\Paladin\AutoPaladinBuffs.lua
+Classes\Shaman\AutoShamanBuffs.lua
+Classes\Hunter\AutoHunterBuffs.lua
+
 Classes\Warlock\WarlockAnalyze.lua
 Classes\Warlock\AutoDoT.lua
 Classes\Warlock\PetAnalyze.lua
