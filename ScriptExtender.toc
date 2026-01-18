@@ -1,0 +1,16 @@
+## Interface: 11200
+## Title: ScriptExtender
+## Notes: Custom macros and scripts for Turtle WoW
+## Author: You
+## Version: 1.0
+
+ScriptExtender.lua
+Utils\Core.lua
+Constants\FoodAndWater.lua
+General\Core.lua
+General\Consumables.lua
+General\SmartCleanse.lua
+General\Combat.lua
+General\Equipment.lua
+Paladin\Core.lua
+Warlock\Core.lua
