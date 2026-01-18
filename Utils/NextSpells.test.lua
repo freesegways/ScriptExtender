@@ -1,85 +1,73 @@
--- Features/NextSpells.test.lua
+-- Utils/NextSpells.test.lua
 
-ScriptExtender_Tests["NextSpells"] = function(t)
+ScriptExtender_Tests["NextSpells_Filtering"] = function(t)
     -- Mocks
     local messages = {}
 
-    -- Mock DEFAULT_CHAT_FRAME to capture output
     t.Mock("DEFAULT_CHAT_FRAME", {
         AddMessage = function(self, msg)
             table.insert(messages, msg)
         end
     })
 
-    local mockClass = "PRIEST"
-    local mockLevel = 1
+    t.Mock("UnitClass", function(unit) return "Priest", "PRIEST" end)
+    t.Mock("UnitLevel", function(unit) return 5 end) -- User is level 5
 
-    -- Mock WoW API
-    t.Mock("UnitClass", function(unit)
-        if unit == "player" then return "Priest", mockClass end
-    end)
-
-    t.Mock("UnitLevel", function(unit)
-        if unit == "player" then return mockLevel end
-    end)
-
-    -- Mock Spell Data
-    local originalData = ScriptExtender_SpellLevels
-    -- We'll just define the global directly since the runner doesn't support complex table patching easily
-    -- But wait, ScriptExtender_SpellLevels is global. We can just modify it and rely on RestoreMocks?
-    -- Tests/Core.lua RestoreMocks iterates over `Original` and calls setglobal.
-    -- It only captures things mocked via t.Mock.
-    -- So for table modification, we should probably manually save/restore or just use t.Mock to replace the WHOLE table.
+    -- Force the global player class to match our mock
+    ScriptExtender_PlayerClass = "PRIEST"
 
     t.Mock("ScriptExtender_SpellLevels", {
         PRIEST = {
-            [1] = { { name = "Spell Level 1", learnCost = 10 } },
-            [4] = { { name = "Spell Level 4", learnCost = 100 } },
-            [6] = { { name = "Spell Level 6", learnCost = 200 } },
+            [4] = {
+                { name = "Shadow Word: Pain (Rank 1)", learnCost = 100 },
+                { name = "Lesser Heal (Rank 2)",       learnCost = 100 },
+            },
+            [6] = {
+                { name = "Smite (Rank 2)", learnCost = 200 },
+            }
         }
     })
 
-    local NextSpellsHandler = SlashCmdList["NEXTSPELLS"]
-    t.Assert(NextSpellsHandler, "NextSpells handler should be registered in SlashCmdList")
+    -- Mock Spellbook: Knowledge of Lesser Heal only
+    t.Mock("GetNumSpellTabs", function() return 1 end)
+    t.Mock("GetSpellTabInfo", function(tab) return "General", "", 0, 1 end)
+    t.Mock("GetSpellName", function(index, book)
+        if index == 1 then
+            return "Lesser Heal", "Rank 2"
+        end
+        return nil, nil
+    end)
 
-    -- Test Case 1: Level 1 Priest, Next spells at Level 4
-    messages = {}
-    mockLevel = 1
-    NextSpellsHandler()
+    -- Command registry check
+    local cmdData = ScriptExtender_Commands["nextspells"]
+    t.Assert(cmdData, "NextSpells should be registered.")
 
-    local foundHeader = false
-    local foundSpell = false
-    local foundCost = false
+    -- Execute
+    NextSpells()
+
+    local foundMissedHeader = false
+    local foundUpcomingHeader = false
+    local foundSWP = false
+    local foundSmite = false
+    local foundLesserHeal = false
+    local foundTotalCost = false
 
     for _, msg in ipairs(messages) do
-        if string.find(msg, "Next Spells at Level 4") then foundHeader = true end
-        if string.find(msg, "Spell Level 4") then foundSpell = true end
-        if string.find(msg, "1s") then foundCost = true end
+        if string.find(msg, "MISSED Spells") then foundMissedHeader = true end
+        if string.find(msg, "UPCOMING Spells at Level 6") then foundUpcomingHeader = true end
+        if string.find(msg, "Shadow Word: Pain") then foundSWP = true end
+        if string.find(msg, "Smite") then foundSmite = true end
+        if string.find(msg, "Lesser Heal") then foundLesserHeal = true end
+        if string.find(msg, "Total Training Cost") and string.find(msg, "3s") then foundTotalCost = true end
     end
 
-    t.Assert(foundHeader, "Level 1: Should find 'Next Spells at Level 4' header")
-    t.Assert(foundSpell, "Level 1: Should list 'Spell Level 4'")
-    t.Assert(foundCost, "Level 1: Should show cost formatted as 1s")
+    t.Assert(foundMissedHeader, "Should show MISSED header.")
+    t.Assert(foundUpcomingHeader, "Should show UPCOMING header for level 6.")
+    t.Assert(foundSWP, "Should show the missed spell (Shadow Word: Pain).")
+    t.Assert(foundSmite, "Should show the upcoming spell (Smite).")
+    t.Assert(not foundLesserHeal, "Should NOT show already learned spell.")
+    t.Assert(foundTotalCost, "Should show combined cost (100c missed + 200c upcoming = 300c = 3s).")
 
-    -- Test Case 2: Level 4 Priest, Next spells at Level 6
-    messages = {}
-    mockLevel = 4
-    NextSpellsHandler()
-
-    foundHeader = false
-    for _, msg in ipairs(messages) do
-        if string.find(msg, "Next Spells at Level 6") then foundHeader = true end
-    end
-    t.Assert(foundHeader, "Level 4: Should find 'Next Spells at Level 6' header")
-
-    -- Test Case 3: Level 6 Priest, No future spells
-    messages = {}
-    mockLevel = 6
-    NextSpellsHandler()
-
-    local foundEnd = false
-    for _, msg in ipairs(messages) do
-        if string.find(msg, "max known spell level") then foundEnd = true end
-    end
-    t.Assert(foundEnd, "Level 6: Should report max known spell level")
+    -- Cleanup
+    ScriptExtender_PlayerClass = nil
 end

@@ -1970,18 +1970,23 @@ function ScriptExtender_FormatMoney(copper)
     end
 
     local g = math.floor(copper / 10000)
-    local s = math.floor((copper % 10000) / 100)
-    local c = copper % 100
+    local s = math.floor((copper - (g * 10000)) / 100)
+    local c = copper - (g * 10000) - (s * 100)
 
     local parts = {}
     if g > 0 then table.insert(parts, g .. "g") end
     if s > 0 or (g > 0 and c > 0) then table.insert(parts, s .. "s") end
     if c > 0 and g == 0 then table.insert(parts, c .. "c") end
 
-    if #parts == 0 then
+    if table.getn(parts) == 0 then
         return "0c"
     else
-        return table.concat(parts, " ")
+        -- concatenation manual loop for safety in 5.0 if needed, but table.concat is fine
+        local res = ""
+        for i = 1, table.getn(parts) do
+            res = res .. parts[i] .. (i < table.getn(parts) and " " or "")
+        end
+        return res
     end
 end
 
@@ -2011,7 +2016,8 @@ function ScriptExtender_IsSpellLearned(spellName, classToken)
     end
 
     -- Try to split "Name (Rank X)" into base + rank
-    local baseName, rankText = spellName:match("^(.-)%s*%((.-)%)$")
+    -- string.match is Lua 5.1+, using string.find for 5.0/1.12
+    local _, _, baseName, rankText = string.find(spellName, "^(.-)%s*%((.-)%)$")
     if not baseName then
         baseName = spellName
     end

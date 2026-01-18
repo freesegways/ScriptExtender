@@ -18,37 +18,42 @@ function ScriptExtender_Print(msg)
 end
 
 -- Register a function for the Help command
--- name: The string name of the function (e.g. "HelloWorld")
--- description: A short description of what it does
 function ScriptExtender_Register(name, description)
-    ScriptExtender_Commands[name] = description
-    DEFAULT_CHAT_FRAME:AddMessage("SE: Registered " .. name)
+    local key = string.lower(name)
+    ScriptExtender_Commands[key] = { name = name, desc = description }
+    -- We'll log to debug instead of chat to avoid cluttering at login
+    ScriptExtender_Log("Registered: " .. name)
 end
 
 -- Slash Command Handler
 SLASH_SCRIPTEXTENDER1 = "/se"
 SLASH_SCRIPTEXTENDER2 = "/scriptextender"
 SlashCmdList["SCRIPTEXTENDER"] = function(msg)
-    -- Fixed: string.find returns start, end, capture1, capture2
-    -- We need to grab the captures, not the indices.
     local _, _, cmd, rest = string.find(msg, "^%s*(%S+)(.*)")
-    
-    if not cmd or cmd == "" or cmd == "help" then
+
+    if not cmd or cmd == "" or string.lower(cmd) == "help" then
         ScriptExtender_Help()
-    elseif cmd == "debug" then
-        if ScriptExtender_Debug then
-            ScriptExtender_Debug = false
-            ScriptExtender_Print("Debug checks disabled.")
-        else
-            ScriptExtender_Debug = true
-            ScriptExtender_Print("Debug checks enabled.")
+        return
+    end
+
+    local commandKey = string.lower(cmd)
+
+    if commandKey == "debug" then
+        ScriptExtender_Debug = not ScriptExtender_Debug
+        ScriptExtender_Print("Debug checks " .. (ScriptExtender_Debug and "enabled." or "disabled."))
+    elseif commandKey == "registry" or commandKey == "list" then
+        ScriptExtender_Print("Currently Registered Commands:")
+        for k, v in pairs(ScriptExtender_Commands) do
+            DEFAULT_CHAT_FRAME:AddMessage(" - " .. k .. " -> " .. v.name)
         end
-    elseif ScriptExtender_Commands[cmd] then
-        local func = getglobal(cmd)
-        if func and type(func) == "function" then
-            func()
+    elseif ScriptExtender_Commands[commandKey] then
+        local cmdData = ScriptExtender_Commands[commandKey]
+        local func = getglobal(cmdData.name)
+
+        if type(func) == "function" then
+            func(rest)
         else
-            ScriptExtender_Print("Error: Function " .. cmd .. " is not executable.")
+            ScriptExtender_Print("Error: Function " .. tostring(cmdData.name) .. " not found.")
         end
     else
         ScriptExtender_Print("Unknown command: " .. tostring(cmd) .. ". Type /se help for a list.")
@@ -57,21 +62,16 @@ end
 
 function ScriptExtender_Help()
     ScriptExtender_Print("Available Commands:")
-    
-    local sortedCmds = {}
-    local count = 0
-    for name, desc in pairs(ScriptExtender_Commands) do
-        table.insert(sortedCmds, {name=name, desc=desc})
-        count = count + 1
+
+    local keys = {}
+    for k in pairs(ScriptExtender_Commands) do
+        table.insert(keys, k)
     end
-    
-    if count == 0 then
-        DEFAULT_CHAT_FRAME:AddMessage("SE Error: No commands found in registry.")
-    end
-    
-    table.sort(sortedCmds, function(a,b) return a.name < b.name end)
-    
-    for _, cmd in ipairs(sortedCmds) do
+    table.sort(keys)
+
+    for i = 1, table.getn(keys) do
+        local k = keys[i]
+        local cmd = ScriptExtender_Commands[k]
         DEFAULT_CHAT_FRAME:AddMessage("|cffffd700/se " .. cmd.name .. "|r - " .. cmd.desc)
     end
     DEFAULT_CHAT_FRAME:AddMessage("|cffffd700/se debug|r - Toggles debug logging.")
