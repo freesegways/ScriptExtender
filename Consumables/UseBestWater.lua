@@ -8,6 +8,20 @@ function UseBestWater()
         return
     end
 
+    -- 1. Check if already drinking
+    for i = 1, 16 do
+        local b = UnitBuff("player", i)
+        if not b then break end
+        if string.find(b, "Drink") or string.find(b, "Bottle") then
+            return -- Already drinking
+        end
+    end
+
+    -- 2. Check if mana is full
+    if UnitMana("player") >= UnitManaMax("player") then
+        return
+    end
+
     -- Get sorted list of Drink ("Drink", Buff=any, Conjured=any)
     local drinks = ScriptExtender_GetSortedFoodItems("Drink", nil, nil)
 
@@ -43,13 +57,13 @@ function UseBestWater()
     -- Count Remaining
     local totalCount = 0
     for b = 0, 4 do
-       for s = 1, GetContainerNumSlots(b) do
-          local link = GetContainerItemLink(b,s)
-          if link and string.find(link, bestDrinkName) then
-             local _, count = GetContainerItemInfo(b,s)
-             totalCount = totalCount + count
-          end
-       end
+        for s = 1, GetContainerNumSlots(b) do
+            local link = GetContainerItemLink(b, s)
+            if link and string.find(link, bestDrinkName) then
+                local _, count = GetContainerItemInfo(b, s)
+                totalCount = totalCount + count
+            end
+        end
     end
 
     local remaining = totalCount - 1

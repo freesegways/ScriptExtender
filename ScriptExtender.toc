@@ -26,10 +26,13 @@ Constants\FoodAndWater.lua
 Constants\Potions.lua
 Constants\ClassSpells.lua
 Constants\BuffsAndDebuffs.lua
+Constants\Bandages.lua
 
 Consumables\UseBestBuffFood.lua
 Consumables\UseBestBuffFood.test.lua
 Consumables\UseBestWater.lua
+Consumables\UseSmartWater.lua
+Consumables\UseSmartWater.test.lua
 Consumables\UseBestBandage.lua
 Consumables\UseSmartFood.lua
 Consumables\UseSmartFood.test.lua
