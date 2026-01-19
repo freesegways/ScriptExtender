@@ -1,79 +1,130 @@
 -- Classes/Warlock/AutoWarlockBuffs.lua
--- Automatically handles Warlock buffs (Demon Skin/Armor, Unending Breath, Detect Invisibility).
+-- Automatically handles Warlock buffs (Demon Skin/Armor, Unending Breath, Felstone).
 
 if not AB_Track then AB_Track = {} end
 if not AB_LastPrint then AB_LastPrint = 0 end
 
+-- Create scanning tooltip for name-based buff detection
+local SE_ScanTooltip = CreateFrame("GameTooltip", "SE_ScanTooltip", nil, "GameTooltipTemplate")
+SE_ScanTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+
 function AutoWarlockBuffs(m)
     local tm, th = GetTime(), (tonumber(m) or 5) * 60
-    local S = { "Demon Armor", "Demon Skin", "Unending Breath", "Detect Greater Invisibility" }
-    local T = { "RagingScream", "RagingScream", "Shadow_DemonBreath", "Shadow_DetectInvisibility" } -- Textures need verification
-    local D = { 1800, 1800, 600, 600 }
-    local W = { 5, 5, 1, 1 }
-    local U = { "player" } -- Warlocks mostly buff self, maybe Breath for others
+    local _, pClass = UnitClass("player")
 
-    -- 1. Check Spell Availability
-    local av = { false, false, false, false }
-    local i = 1
-    while true do
-        local n = GetSpellName(i, 1)
-        if not n then break end
-        for j = 1, 4 do if n == S[j] then av[j] = true end end
-        -- Demon Armor overrides Demon Skin
-        if n == "Demon Armor" then
-            av[2] = false
-            av[1] = true
-        end
-        i = i + 1
-    end
+    -- Configuration
+    local BUFFS = {
+        {
+            -- 1. Demon Armor / Demon Skin
+            type = "spell",
+            spells = { "Demon Armor", "Demon Skin" },
+            buffName = "Demon " -- Common substring
+        },
+        {
+            -- 2. Unending Breath
+            type = "spell",
+            spells = { "Unending Breath" },
+            buffName = "Unending Breath"
+        },
+        {
+            -- 3. Felstone
+            type = "item",
+            buffName = "Felstone",
+            itemName = "Felstone",
+            createSpell = "Create Felstone",
+            reagent = "Soul Shard"
+        }
+    }
 
-    -- HELPER: Get Buff State
-    local function GetSt(u, id)
-        local lim = th
-        if u == "player" then
-            local j = 0
-            while GetPlayerBuff(j, "HELPFUL") >= 0 do
-                local b = GetPlayerBuff(j, "HELPFUL")
-                local tx = GetPlayerBuffTexture(b)
-                if tx and string.find(tx, T[id]) then
-                    local rem = GetPlayerBuffTimeLeft(b)
-                    if rem < lim then return 50, math.floor(rem / 60) .. "m" end
-                    return 0, math.floor(rem / 60) .. "m"
+    local function FindItemInBag(itemName)
+        -- ScriptExtender_Print("DEBUG: Searching bags for '" .. itemName .. "'")
+        for b = 0, 4 do
+            for s = 1, GetContainerNumSlots(b) do
+                local link = GetContainerItemLink(b, s)
+                if link then
+                    -- local name = GetItemInfo(link) -- sometimes link is enough
+                    -- Case insensitive check on the full link text
+                    if string.find(string.lower(link), string.lower(itemName)) then
+                        return b, s
+                    end
                 end
-                j = j + 1
             end
-            return 100, "Miss"
         end
-        return 0, "?"
+        return nil, nil
     end
 
-    -- 2. Scan
-    local best = { sc = -1 }
+    local function HasBuff(unit, buffName)
+        local i = 0
+        while GetPlayerBuff(i, "HELPFUL") >= 0 do
+            local index = GetPlayerBuff(i, "HELPFUL")
 
-    for _, u in ipairs(U) do
-        if UnitExists(u) then
-            for id = 1, 4 do
-                local ok = false
-                if id == 1 or id == 2 then if av[id] then ok = true end end -- Armor/Skin
-                -- Skip others for basic automation for now
+            -- Use Tooltip to get the real name
+            SE_ScanTooltip:ClearLines()
+            SE_ScanTooltip:SetPlayerBuff(index)
+            local name = SE_ScanTooltipTextLeft1:GetText()
 
-                if ok then
-                    local sc, txt = GetSt(u, id)
-                    if sc > 0 and (sc + W[id]) > best.sc then
-                        best = { sc = sc + W[id], u = u, sp = S[id], id = id }
+            if name and string.find(name, buffName) then
+                local rem = GetPlayerBuffTimeLeft(index)
+                return true, rem
+            end
+            i = i + 1
+        end
+        return false, 0
+    end
+
+    -- Execution
+    for _, buffDef in ipairs(BUFFS) do
+        if buffDef.type == "spell" then
+            -- Handle Standard Spells
+            local bestSpell = nil
+            for _, sp in ipairs(buffDef.spells) do
+                if ScriptExtender_IsSpellLearned(sp, pClass) then
+                    bestSpell = sp
+                    break
+                end
+            end
+
+            if bestSpell then
+                local hasIt, rem = HasBuff("player", buffDef.buffName or bestSpell)
+
+                if not hasIt or rem < 300 then
+                    ScriptExtender_Print("AutoBuff: Need " .. bestSpell .. " (Rem: " .. (rem or 0) .. "s)")
+                    CastSpellByName(bestSpell)
+                    return -- One action per tick
+                end
+            end
+        elseif buffDef.type == "item" then
+            -- Handle Item Buffs (Felstone)
+            local hasIt, rem = HasBuff("player", buffDef.buffName)
+
+            if not hasIt or rem < 300 then
+                -- 1. Try to use item
+                local b, s = FindItemInBag(buffDef.itemName)
+
+                if b and s then
+                    UseContainerItem(b, s)
+                    ScriptExtender_Print("AutoBuff: Using " .. buffDef.itemName)
+                    return
+                else
+                    -- 2. Create item
+                    if ScriptExtender_IsSpellLearned(buffDef.createSpell, pClass) then
+                        local rb, rs = FindItemInBag(buffDef.reagent)
+                        if rb and rs then
+                            if UnitMana("player") > 139 then
+                                CastSpellByName(buffDef.createSpell)
+                                ScriptExtender_Print("AutoBuff: Creating " .. buffDef.itemName)
+                                return
+                            else
+                                ScriptExtender_Print("AutoBuff: OOM for " .. buffDef.createSpell)
+                            end
+                        else
+                            ScriptExtender_Print("AutoBuff: Missing " .. buffDef.reagent)
+                        end
                     end
                 end
             end
         end
     end
-
-    -- 3. Execute
-    if best.u then
-        TargetUnit(best.u)
-        CastSpellByName(best.sp)
-        if best.u ~= "target" then TargetLastTarget() end
-        ScriptExtender_Print("[AB] Casting " .. best.sp .. " > " .. UnitName(best.u))
-    end
 end
 
-ScriptExtender_Register("AutoWarlockBuffs", "Automatically casts Warlock self-buffs (Demon Armor/Skin).")
+ScriptExtender_Register("AutoWarlockBuffs", "Automatically casts Warlock self-buffs (Demon Armor/Skin, Felstone).")

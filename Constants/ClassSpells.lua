@@ -1084,6 +1084,7 @@ local SpellLevels = {
             { name = "Subjugate Demon (Rank 1)",  learnCost = 6000, powerCost = 250, type = "Utility", castTime = 3.0, duration = 300 },
         },
         [32] = {
+            { name = "Create Felstone",                learnCost = 7000, powerCost = 139, type = "Utility",       castTime = 3.0, duration = 0 }, -- Turtle Custom
             { name = "Curse of the Elements (Rank 1)", learnCost = 7000, powerCost = 100, type = "Utility",       castTime = 0,   duration = 300 },
             { name = "Curse of Weakness (Rank 4)",     learnCost = 7000, powerCost = 135, type = "Utility",       castTime = 0,   duration = 120 },
             { name = "Shadow Ward (Rank 1)",           learnCost = 7000, powerCost = 135, type = "Buff",          castTime = 0,   duration = 30 },

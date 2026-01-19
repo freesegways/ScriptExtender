@@ -4,118 +4,168 @@
 if not AB_Track then AB_Track = {} end
 if not AB_LastPrint then AB_LastPrint = 0 end
 
+-- Create scanning tooltip for name-based buff detection
+local SE_ScanTooltip = CreateFrame("GameTooltip", "SE_ScanTooltip_Druid", nil, "GameTooltipTemplate")
+SE_ScanTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+
 function AutoDruidBuffs(m)
     local tm, th = GetTime(), (tonumber(m) or 5) * 60
-    local S = { "Mark of the Wild", "Thorns", "Omen of Clarity" }
-    local T = { "Regeneration", "Thorns", "CrystalBall" } -- Textures: Spell_Nature_Regeneration, Spell_Nature_Thorns
-    local D = { 1800, 600, 600 }
-    local W = { 5, 3, 2 }                                 -- Priorities: Mark > Thorns > Omen
-    local U = { "player", "target", "party1", "party2", "party3", "party4" }
+    local _, pClass = UnitClass("player")
 
-    -- 1. Check Spell Availability
-    local av = { false, false, false }
-    local i = 1
-    while true do
-        local n = GetSpellName(i, 1)
-        if not n then break end
-        for j = 1, 3 do if n == S[j] then av[j] = true end end
-        i = i + 1
-    end
+    -- Configuration
+    -- Spells to check. Order indicates generic priority if multiple are missing (though scoring handles target priority).
+    local BUFFS = {
+        {
+            -- Mark of the Wild
+            spell = "Mark of the Wild",
+            buffName = "Mark of the Wild",
+            targetType = "party", -- Cast on self and party
+            classFilter = nil     -- All classes
+        },
+        {
+            -- Thorns
+            spell = "Thorns",
+            buffName = "Thorns",
+            targetType = "party",
+            classFilter = { ["WARRIOR"] = true, ["PALADIN"] = true, ["ROGUE"] = true, ["DRUID"] = true, ["SHAMAN"] = true } -- Melee-ish classes + Tanks
+        },
+        {
+            -- Omen of Clarity
+            spell = "Omen of Clarity",
+            buffName = "Omen of Clarity",
+            targetType = "self", -- Self only
+            classFilter = nil
+        }
+    }
 
-    -- HELPER: Get Buff State
-    local function GetSt(u, id)
-        local lim = th
-        -- PLAYER
-        if u == "player" then
-            local j = 0
-            while GetPlayerBuff(j, "HELPFUL") >= 0 do
-                local b = GetPlayerBuff(j, "HELPFUL")
-                local tx = GetPlayerBuffTexture(b)
-                if tx and string.find(tx, T[id]) then
-                    local rem = GetPlayerBuffTimeLeft(b)
-                    if rem < lim then return 50, math.floor(rem / 60) .. "m" end
-                    return 0, math.floor(rem / 60) .. "m"
-                end
-                j = j + 1
+    local U = { "player", "party1", "party2", "party3", "party4" }
+
+    -- Helper: HasBuff (Tooltip Scan)
+    local function HasBuff(unit, buffName)
+        local i = 0
+        while UnitBuff(unit, i + 1) do -- UnitBuff in 1.12 is 1-indexed? No somewhat inconsistent. Standard loop:
+            -- Using GetPlayerBuff for player is reliable, UnitBuff for others.
+            -- Actually, UnitBuff returns name/texture in later expansions. In 1.12 it returns texture.
+            -- We need to use valid indices.
+
+            -- Universal Scanner for Name:
+            SE_ScanTooltip:ClearLines()
+            if unit == "player" then
+                -- Player specific scan for accuracy
+                local index = GetPlayerBuff(i, "HELPFUL")
+                if index < 0 then break end
+                SE_ScanTooltip:SetPlayerBuff(index)
+            else
+                -- Party unit scan
+                SE_ScanTooltip:SetUnitBuff(unit, i + 1)
             end
-            return 100, "Miss"
-            -- PARTY
-        else
-            local f, j = false, 1
-            while UnitBuff(u, j) do
-                if string.find(UnitBuff(u, j), T[id]) then
-                    f = true
-                    break
-                end
-                j = j + 1
-            end
-            local k = UnitName(u) .. T[id]
-            if not f then
-                AB_Track[k] = nil
-                return 100, "Miss"
-            end
-            if not AB_Track[k] then return 0, "?" end
-            local rem = D[id] - (tm - AB_Track[k])
-            if rem < lim then return 50, math.floor(rem / 60) .. "m" end
-            return 0, math.floor(rem / 60) .. "m"
-        end
-    end
 
-    -- 2. Scan Loop
-    local best = { sc = -1 }
+            local name = SE_ScanTooltipTextLeft1:GetText()
+            -- Check validity (UnitBuff returns nil if no buff at index)
+            if unit ~= "player" and not UnitBuff(unit, i + 1) then break end
 
-    for _, u in ipairs(U) do
-        if UnitExists(u) and not UnitIsDeadOrGhost(u) and UnitIsConnected(u) and UnitIsFriend("player", u) then
-            local safe = UnitInParty(u) or u == "player"
-            if safe then
-                for id = 1, 3 do
-                    local ok = false
-
-                    if id == 1 then
-                        -- Mark of the Wild: Cast on everyone
-                        if av[1] then ok = true end
-                    elseif id == 2 then
-                        -- Thorns: Cast on self, Warriors, Paladins, Rogues (Melee)
-                        -- Assuming 'UnitClass' returns uppercase LOCALE independent string in Vanilla is tricky,
-                        -- usually returns localized. We'll try standard check or just apply to tanks if we had a tank detector.
-                        -- For now, simplified: Apply to Warriors (1), Paladins (2), Rogues (4), Druids (11).
-                        if av[2] then
-                            local _, cls = UnitClass(u) -- Returns localized name, class filename (e.g. "WARRIOR")
-                            if cls == "WARRIOR" or cls == "PALADIN" or cls == "ROGUE" or cls == "DRUID" then
-                                ok = true
-                            end
-                        end
-                    elseif id == 3 then
-                        -- Omen of Clarity: Self only
-                        if u == "player" and av[3] then ok = true end
-                    end
-
-                    if ok then
-                        local inRange = (u == "player" or CheckInteractDistance(u, 4))
-                        if inRange then
-                            local sc, txt = GetSt(u, id)
-                            if sc > 0 and (sc + W[id]) > best.sc then
-                                best = { sc = sc + W[id], u = u, sp = S[id], id = id }
-                            end
-                        end
+            if name and string.find(name, buffName) then
+                -- Duration check
+                local rem = 0
+                if unit == "player" then
+                    local index = GetPlayerBuff(i, "HELPFUL")
+                    rem = GetPlayerBuffTimeLeft(index)
+                else
+                    -- Estimating for party members is hard without addons.
+                    -- We rely on tracking: AB_Track[UnitName..BuffName]
+                    local k = UnitName(unit) .. buffName
+                    if AB_Track[k] then
+                        local elapsed = tm - AB_Track[k]
+                        -- We assume strict duration match is complex, so we check if we tracked it recently.
+                        -- If we cast it < 25 mins ago (for 30m buff) we assume it's good?
+                        -- Mark is 30m. Thorns is 10m.
+                        -- Let's define duration in BUFFS config? For now use generalized logic:
+                        -- If we see the buff, we assume it's good unless we strictly know otherwise.
+                        -- Vanilla API doesn't give timeleft for others easily.
+                        rem = 3600 -- Dummy high value to say "Present"
+                    else
+                        rem = 3600 -- Present but untracked
                     end
                 end
+                return true, rem
+            end
+            i = i + 1
+        end
+        return false, 0
+    end
+
+    -- Logic
+    local best = { priority = -1 }
+
+    for _, buffDef in ipairs(BUFFS) do
+        -- 1. Do we know the spell?
+        if ScriptExtender_IsSpellLearned(buffDef.spell, pClass) then
+            -- 2. Targets
+            for _, unit in ipairs(U) do
+                local process = false
+
+                -- Valid Unit?
+                if UnitExists(unit) and UnitIsFriend("player", unit) and not UnitIsDeadOrGhost(unit) and UnitIsConnected(unit) then
+                    local isSelf = (unit == "player")
+
+                    -- Check Scope
+                    if buffDef.targetType == "self" and isSelf then
+                        process = true
+                    elseif buffDef.targetType == "party" then
+                        -- Check Class Filter
+                        if buffDef.classFilter then
+                            local _, uClass = UnitClass(unit)
+                            if buffDef.classFilter[uClass] then
+                                process = true
+                            end
+                        else
+                            process = true -- Everyone
+                        end
+                    end
+
+                    -- Range Check
+                    if process and not isSelf then
+                        if not CheckInteractDistance(unit, 4) then process = false end
+                    end
+                end
+
+                if process then
+                    local hasIt, rem = HasBuff(unit, buffDef.buffName)
+                    -- Re-buff if missing or < 5 mins (300s) on self
+                    -- For party, we just check existence because timeleft is hard
+                    local threshold = (unit == "player") and 300 or 0
+
+                    if not hasIt or (unit == "player" and rem < threshold) then
+                        -- Score this need
+                        -- Use fixed weighting:
+                        -- Mark: 5
+                        -- Thorns: 3
+                        -- Omen: 2
+                        local score = 0
+                        if buffDef.spell == "Mark of the Wild" then score = 5 end
+                        if buffDef.spell == "Thorns" then score = 3 end
+                        if buffDef.spell == "Omen of Clarity" then score = 2 end
+
+                        if score > best.priority then
+                            best = { priority = score, unit = unit, spell = buffDef.spell, name = buffDef.buffName }
+                        end
+                    end
+                end
             end
         end
     end
 
-    -- 3. Execute
-    if best.u then
-        TargetUnit(best.u)
-        CastSpellByName(best.sp)
-        if best.u ~= "target" then TargetLastTarget() end
-        AB_Track[UnitName(best.u) .. T[best.id]] = tm
-        ScriptExtender_Print("[AB] Casting " .. best.sp .. " > " .. UnitName(best.u))
-    else
-        if (tm - AB_LastPrint) > 10 then
-            AB_LastPrint = tm
-            -- ScriptExtender_Print("--- AutoBuffs Status (Druid) ---")
-        end
+    -- Execution
+    if best.unit then
+        local uName = UnitName(best.unit)
+        ScriptExtender_Print("AutoBuff: Casting " .. best.spell .. " on " .. uName)
+
+        -- Tracking update (Optimistic)
+        AB_Track[uName .. best.name] = tm
+
+        TargetUnit(best.unit)
+        CastSpellByName(best.spell)
+        if best.unit ~= "target" then TargetLastTarget() end
     end
 end
 
