@@ -28,30 +28,32 @@ function ScriptExtender_RunCombatLoop(actors)
     end
 
     -- 2. AUTO SCANNING
-    for i = 1, 25 do
-        TargetNearestEnemy()
-        local u = "target"
-        local n = UnitName(u)
+    if not actors.disableScan then
+        for i = 1, 25 do
+            TargetNearestEnemy()
+            local u = "target"
+            local n = UnitName(u)
 
-        -- Safety: If player is in combat, ignore OOC targets completely (unless it's the manual target we just checked)
-        local valid = true
-        if inCombat and not UnitAffectingCombat(u) then valid = false end
+            -- Safety: If player is in combat, ignore OOC targets completely (unless it's the manual target we just checked)
+            local valid = true
+            if inCombat and not UnitAffectingCombat(u) then valid = false end
 
-        if valid then
-            for idx, actor in ipairs(actors) do
-                -- Pass strict=true to analyzers if in combat
-                local action, type, score = actor.analyzer(u, true, tm)
+            if valid then
+                for idx, actor in ipairs(actors) do
+                    -- Pass strict=true to analyzers if in combat
+                    local action, type, score = actor.analyzer(u, true, tm)
 
-                if score and score > best[idx].score then
-                    -- Track max priority ...
-                    if type == "kill" or type == "dot" or type == "fill" then
-                        local prio = ScriptExtender_GetTargetPriority(u)
-                        if prio > maxPrioSeen then maxPrioSeen = prio end
-                        if prio == 1 and maxPrioSeen >= 2 then score = -999 end
-                    end
+                    if score and score > best[idx].score then
+                        -- Track max priority ...
+                        if type == "kill" or type == "dot" or type == "fill" then
+                            local prio = ScriptExtender_GetTargetPriority(u)
+                            if prio > maxPrioSeen then maxPrioSeen = prio end
+                            if prio == 1 and maxPrioSeen >= 2 then score = -999 end
+                        end
 
-                    if score > best[idx].score then
-                        best[idx] = { score = score, action = action, type = type, targetName = n, strict = true }
+                        if score > best[idx].score then
+                            best[idx] = { score = score, action = action, type = type, targetName = n, strict = true }
+                        end
                     end
                 end
             end
@@ -59,6 +61,7 @@ function ScriptExtender_RunCombatLoop(actors)
     end
 
     -- Phase 2: EXECUTION
+    local anyActionExecuted = false
     for idx, actor in ipairs(actors) do
         local b = best[idx]
         if b.action and b.score > -100 then
@@ -83,11 +86,13 @@ function ScriptExtender_RunCombatLoop(actors)
 
             if needScan then
                 local found = false
-                for i = 1, 25 do
-                    TargetNearestEnemy()
-                    if UnitName("target") == b.targetName then
-                        if VerifyTarget() then
-                            found = true; break
+                if not actors.disableScan then
+                    for i = 1, 25 do
+                        TargetNearestEnemy()
+                        if UnitName("target") == b.targetName then
+                            if VerifyTarget() then
+                                found = true; break
+                            end
                         end
                     end
                 end
@@ -99,10 +104,16 @@ function ScriptExtender_RunCombatLoop(actors)
                 -- Final verification safety wrapper
                 if not b.strict or UnitAffectingCombat("target") then
                     actor.onExecute(b.action, b.targetName, tm)
+                    anyActionExecuted = true
                 end
             end
         end
     end
 
-    if not UnitExists("target") or UnitIsDead("target") then ClearTarget() end
+    -- Cleanup
+    if not UnitExists("target") or UnitIsDead("target") then
+        ClearTarget()
+    elseif actors.untargetIfNoActionExecuted and not anyActionExecuted then
+        ClearTarget()
+    end
 end

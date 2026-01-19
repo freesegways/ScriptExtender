@@ -20,6 +20,7 @@ Utils\GetUnitHOTStatus.test.lua
 Utils\NextSpells.lua
 Utils\NextSpells.test.lua
 Utils\GetTargetPriority.lua
+Utils\TargetSafety.lua
 Utils\CombatLoop.lua
 
 Constants\FoodAndWater.lua
