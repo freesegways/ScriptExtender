@@ -19,6 +19,8 @@ function AutoPet()
         }
     }
 
+    actors.untargetIfNoActionExecuted = true
+
     ScriptExtender_RunCombatLoop(actors)
 end
 
