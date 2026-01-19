@@ -4,9 +4,10 @@ ScriptExtender_Tests["SmartRes_Priest_Target"] = function(t)
     local cast = nil
     t.Mock("UnitClass", function(u) return "Priest", "PRIEST" end)
 
-    -- Target Valid
+    -- Target Valid (Unreleased Corpse)
     t.Mock("UnitExists", function(u) return u == "target" end)
-    t.Mock("UnitIsDeadOrGhost", function(u) return u == "target" end)
+    t.Mock("UnitIsDead", function(u) return u == "target" end) -- DEAD
+    t.Mock("UnitIsGhost", function(u) return false end)        -- NOT GHOST
     t.Mock("UnitIsFriend", function(u, t) return true end)
     t.Mock("UnitName", function(u) return "DeadGuy" end)
     t.Mock("CastSpellByName", function(s) cast = s end)
@@ -21,9 +22,10 @@ ScriptExtender_Tests["SmartRes_Shaman_Mouseover"] = function(t)
     local retargeted = false
     t.Mock("UnitClass", function(u) return "Shaman", "SHAMAN" end)
 
-    -- Mouseover Valid
+    -- Mouseover Valid (Unreleased Corpse)
     t.Mock("UnitExists", function(u) return u == "mouseover" or u == "target" end)
-    t.Mock("UnitIsDeadOrGhost", function(u) return true end)
+    t.Mock("UnitIsDead", function(u) return true end)   -- DEAD
+    t.Mock("UnitIsGhost", function(u) return false end) -- NOT GHOST
     t.Mock("UnitIsFriend", function(u) return true end)
     t.Mock("UnitName", function(u) return "DeadMouse" end)
 
@@ -49,8 +51,10 @@ ScriptExtender_Tests["SmartRes_AutoTarget_Priority"] = function(t)
     end)
 
     -- No Target, No Mouseover
+    -- Party Members are Unreleased Corpses
     t.Mock("UnitExists", function(u) return u == "party1" or u == "party2" end)
-    t.Mock("UnitIsDeadOrGhost", function(u) return true end) -- All dead
+    t.Mock("UnitIsDead", function(u) return true end)   -- DEAD
+    t.Mock("UnitIsGhost", function(u) return false end) -- NOT GHOST
     t.Mock("UnitIsFriend", function(u) return true end)
     t.Mock("UnitIsUnit", function(a, b) return a == b end)
 
@@ -69,11 +73,13 @@ end
 
 ScriptExtender_Tests["SmartRes_AutoTarget_Range"] = function(t)
     local targeted = nil
+    local cast = nil
 
     t.Mock("UnitClass", function(u) return "Priest", "PRIEST" end)
 
     t.Mock("UnitExists", function(u) return u == "party1" end)
-    t.Mock("UnitIsDeadOrGhost", function(u) return true end)
+    t.Mock("UnitIsDead", function(u) return true end)
+    t.Mock("UnitIsGhost", function(u) return false end)
     t.Mock("UnitIsFriend", function(u) return true end)
     t.Mock("UnitIsUnit", function(a, b) return a == b end)
 
@@ -82,21 +88,26 @@ ScriptExtender_Tests["SmartRes_AutoTarget_Range"] = function(t)
     t.Mock("GetNumRaidMembers", function() return 0 end)
 
     t.Mock("TargetUnit", function(u) targeted = u end)
+    t.Mock("CastSpellByName", function(s) cast = s end)
 
     SmartRes()
 
+    -- Expect FALLBACK behavior (Click Skeleton), so cast is not nil, but targeted IS nil
     t.Assert(targeted == nil, "Should NOT target units out of range.")
+    t.Assert(cast == "Resurrection", "Should cast spell (Fallback mode).")
 end
 
 ScriptExtender_Tests["SmartRes_NoValid"] = function(t)
     local cast = nil
     t.Mock("UnitClass", function(u) return "Priest", "PRIEST" end)
     t.Mock("UnitExists", function(u) return u == "target" end)
-    t.Mock("UnitIsDeadOrGhost", function(u) return false end) -- Alive
+    t.Mock("UnitIsDead", function(u) return false end)  -- Alive
+    t.Mock("UnitIsGhost", function(u) return false end) -- Alive
     t.Mock("UnitIsFriend", function(u) return true end)
     t.Mock("CastSpellByName", function(s) cast = s end)
 
     SmartRes()
 
-    t.Assert(cast == nil, "Should not cast if target is alive.")
+    -- Expect FALLBACK behavior
+    t.Assert(cast == "Resurrection", "Should always cast (fallback logic) even if nobody is dead, to allow manual click.")
 end
