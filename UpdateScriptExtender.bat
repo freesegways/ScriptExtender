@@ -2,56 +2,56 @@
 TITLE ScriptExtender Auto-Updater
 COLOR 0A
 
-echo ========================================================
-echo       ScriptExtender Automatic Updater
-echo       Source: https://github.com/freesegways/ScriptExtender
-echo ========================================================
+echo.
+echo [ScriptExtender Auto-Updater]
 echo.
 
-:: 1. Define Paths
-set REPO_URL=https://github.com/freesegways/ScriptExtender/archive/refs/heads/main.zip
-set ZIP_FILE=update.zip
-set EXTRACT_DIR=_update_tmp
+set "ZIP=update.zip"
+set "TMP=_update_tmp"
+set "URL=https://github.com/freesegways/ScriptExtender/archive/refs/heads/main.zip"
 
-:: 2. Download
-echo [1/4] Downloading latest version...
-powershell -Command "try { Invoke-WebRequest -Uri '%REPO_URL%' -OutFile '%ZIP_FILE%' -ErrorAction Stop } catch { Write-Host 'Download failed.' -ForegroundColor Red; exit 1 }"
+:: Clean Start
+if exist "%ZIP%" del "%ZIP%"
+if exist "%TMP%" rmdir /s /q "%TMP%"
 
-if not exist "%ZIP_FILE%" (
-    echo Error: Download failed or file not found.
-    pause
-    exit /b
-)
+:: 1. Download
+echo [1/4] Downloading...
+powershell -Command "Invoke-WebRequest -Uri '%URL%' -OutFile '%ZIP%'"
+if not exist "%ZIP%" goto :Fail
 
-:: 3. Extract
+:: 2. Extract
 echo [2/4] Extracting...
-if exist "%EXTRACT_DIR%" rd /s /q "%EXTRACT_DIR%"
-powershell -Command "Expand-Archive -Path '%ZIP_FILE%' -DestinationPath '%EXTRACT_DIR%' -Force"
+powershell -Command "Expand-Archive -Path '%ZIP%' -DestinationPath '%TMP%' -Force"
+if not exist "%TMP%" goto :Fail
 
-:: Find inner folder (e.g. ScriptExtender-main)
-set "SOURCE_DIR="
-for /d %%D in ("%EXTRACT_DIR%\*") do set "SOURCE_DIR=%%~fD"
+:: 3. Find Source Folder
+echo [3/4] Locating contents...
+set "SRC="
+for /d %%I in ("%TMP%\*") do set "SRC=%%~fI"
 
-if not defined SOURCE_DIR (
-    echo Error: Extraction failed (folder empty).
-    if exist "%EXTRACT_DIR%" rd /s /q "%EXTRACT_DIR%"
-    del "%ZIP_FILE%"
-    pause
-    exit /b
+if "%SRC%"=="" (
+    echo Error: No folder found inside zip.
+    goto :Fail
 )
 
-:: 4. Update
-echo [3/4] Updating from: "%SOURCE_DIR%"
-xcopy /s /y /q "%SOURCE_DIR%\*" "."
+:: 4. Install
+echo [4/4] Installing from: "%SRC%"
+xcopy /s /y /q "%SRC%\*" .
 
 :: 5. Cleanup
-echo [4/4] Cleaning up...
-if exist "%EXTRACT_DIR%" rd /s /q "%EXTRACT_DIR%"
-if exist "%ZIP_FILE%" del "%ZIP_FILE%"
+echo Cleaning up...
+rmdir /s /q "%TMP%"
+del "%ZIP%"
 
 echo.
-echo ========================================================
-echo       Update Complete! Please Reload UI in-game.
-echo ========================================================
+echo Success! Update installed.
+echo Please /reload in game.
+echo.
+pause
+exit /b
+
+:Fail
+echo.
+echo UPDATE FAILED.
 echo.
 pause
