@@ -10,13 +10,16 @@ set "ZIP=update.zip"
 set "TMP=_update_tmp"
 set "URL=https://github.com/freesegways/ScriptExtender/archive/refs/heads/main.zip"
 
+:: Ensure we are in the correct directory
+cd /d "%~dp0"
+
 :: Clean Start
 if exist "%ZIP%" del "%ZIP%"
 if exist "%TMP%" rmdir /s /q "%TMP%"
 
 :: 1. Download
 echo [1/4] Downloading...
-powershell -Command "Invoke-WebRequest -Uri '%URL%' -OutFile '%ZIP%'"
+powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%URL%' -OutFile '%ZIP%'"
 if not exist "%ZIP%" goto :Fail
 
 :: 2. Extract
@@ -40,8 +43,9 @@ xcopy /s /y /q "%SRC%\*" .
 
 :: 5. Cleanup
 echo Cleaning up...
-rmdir /s /q "%TMP%"
-del "%ZIP%"
+timeout /t 2 /nobreak >nul
+if exist "%TMP%" rmdir /s /q "%TMP%"
+if exist "%ZIP%" del "%ZIP%"
 
 echo.
 echo Success! Update installed.
