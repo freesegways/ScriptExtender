@@ -25,23 +25,29 @@ if not exist %ZIP_FILE% (
 
 :: 3. Extract Files
 echo [2/4] Extracting files...
-if exist %TEMP_DIR% rmdir /s /q %TEMP_DIR%
-powershell -Command "Expand-Archive -Path '%ZIP_FILE%' -DestinationPath '.' -Force"
+set EXTRACT_DIR=_update_tmp
+if exist %EXTRACT_DIR% rmdir /s /q %EXTRACT_DIR%
+powershell -Command "Expand-Archive -Path '%ZIP_FILE%' -DestinationPath '%EXTRACT_DIR%' -Force"
 
-if not exist %TEMP_DIR% (
-    echo Error: Extraction failed! The zip file might be empty or branch name is wrong (try master instead of main).
+:: Find the subdirectory (e.g., ScriptExtender-main)
+set "SOURCE_DIR="
+for /d %%D in ("%EXTRACT_DIR%\*") do set "SOURCE_DIR=%%~fD"
+
+if not defined SOURCE_DIR (
+    echo Error: Extraction failed or zip was empty!
+    if exist %EXTRACT_DIR% rmdir /s /q %EXTRACT_DIR%
     del %ZIP_FILE%
     pause
     exit /b
 )
 
 :: 4. Install / Overwrite
-echo [3/4] Updating files...
-xcopy /s /y /q "%TEMP_DIR%\*" "."
+echo [3/4] Updating files from %SOURCE_DIR%...
+xcopy /s /y /q "%SOURCE_DIR%\*" "."
 
 :: 5. Cleanup
 echo [4/4] Cleaning up...
-rmdir /s /q %TEMP_DIR%
+rmdir /s /q %EXTRACT_DIR%
 del %ZIP_FILE%
 
 echo.
