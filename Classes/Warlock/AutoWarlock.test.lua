@@ -54,6 +54,21 @@ ScriptExtender_Tests["AutoWarlock_FullCycle"] = function(t)
     t.Mock("UnitCreatureFamily", function(u) return "Imp" end)
     t.Mock("UnitPowerType", function(u) return 0 end)
 
+    t.Mock("UnitLevel", function(u)
+        if u == "player" then return 60 end
+        return 50 -- Lower level target
+    end)
+    t.Mock("UnitClassification", function(u) return "normal" end)
+    t.Mock("GetContainerNumSlots", function(bag) return 0 end)
+
+    -- Talent Mocks
+    t.Mock("GetNumTalentTabs", function() return 3 end)
+    t.Mock("GetNumTalents", function(t) return 10 end)
+    t.Mock("GetTalentInfo", function(tab, i) return "SomeTalent", "Texture", 0, 0, 0 end) -- Rank 0 by default
+
+    t.Mock("UnitClassification", function(u) return "normal" end)
+    t.Mock("GetContainerNumSlots", function(bag) return 0 end) -- Shadowburn logic
+
     -- Actions
     t.Mock("CastSpellByName", function(s) table.insert(castSpells, s) end)
     t.Mock("PetAttack", function() table.insert(petActions, "Attack") end)
@@ -110,6 +125,9 @@ ScriptExtender_Tests["AutoWarlock_CC_Safety"] = function(t)
     t.Mock("UnitManaMax", function(u) return 100 end)
     t.Mock("UnitCreatureFamily", function(u) return "Imp" end)
     t.Mock("UnitPowerType", function(u) return 0 end)
+    t.Mock("UnitLevel", function(u) return 60 end)
+    t.Mock("UnitClassification", function(u) return "normal" end)
+    t.Mock("GetContainerNumSlots", function(bag) return 0 end)
 
     t.Mock("CastSpellByName", function(s) table.insert(castSpells, s) end)
     t.Mock("PetAttack", function() table.insert(petActions, "Attack") end)
@@ -153,6 +171,9 @@ ScriptExtender_Tests["AutoWarlock_ManualTarget_OOC"] = function(t)
     t.Mock("UnitManaMax", function() return 100 end)
     t.Mock("UnitCreatureFamily", function() return "Imp" end)
     t.Mock("UnitPowerType", function() return 0 end)
+    t.Mock("UnitLevel", function(u) return 60 end)
+    t.Mock("UnitClassification", function(u) return "normal" end)
+    t.Mock("GetContainerNumSlots", function(bag) return 0 end)
     t.Mock("UnitBuff", function() return nil end)
     t.Mock("UnitDebuff", function() return nil end)
 
@@ -203,6 +224,9 @@ ScriptExtender_Tests["AutoWarlock_IgnoreOOCTargets"] = function(t)
     t.Mock("UnitManaMax", function() return 100 end)
     t.Mock("UnitCreatureFamily", function() return "Imp" end)
     t.Mock("UnitPowerType", function() return 0 end)
+    t.Mock("UnitLevel", function(u) return 60 end)
+    t.Mock("UnitClassification", function(u) return "normal" end)
+    t.Mock("GetContainerNumSlots", function(bag) return 0 end)
     t.Mock("UnitBuff", function() return nil end)
     t.Mock("UnitDebuff", function() return nil end)
 

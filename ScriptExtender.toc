@@ -22,6 +22,10 @@ Utils\NextSpells.test.lua
 Utils\GetTargetPriority.lua
 Utils\TargetSafety.lua
 Utils\CombatLoop.lua
+Utils\TalentUtils.lua
+Utils\TalentUtils.test.lua
+Utils\SpellUtils.lua
+Utils\AuraUtils.lua
 
 Constants\FoodAndWater.lua
 Constants\Potions.lua

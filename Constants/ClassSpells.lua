@@ -1082,6 +1082,7 @@ local SpellLevels = {
             { name = "Demon Armor (Rank 2)",      learnCost = 6000, powerCost = 0,   type = "Buff",    castTime = 0,   duration = 1800 },
             { name = "Drain Life (Rank 3)",       learnCost = 6000, powerCost = 125, min = 125,        max = 125,      type = "Damage", castTime = 5.0, duration = 5 },
             { name = "Subjugate Demon (Rank 1)",  learnCost = 6000, powerCost = 250, type = "Utility", castTime = 3.0, duration = 300 },
+            { name = "Siphon Life (Rank 1)",      learnCost = 0,    powerCost = 150, min = 150,        max = 150,      type = "Damage", castTime = 0,   duration = 30 }, -- Talent (30)
         },
         [32] = {
             { name = "Create Felstone",                learnCost = 7000, powerCost = 139, type = "Utility",       castTime = 3.0, duration = 0 }, -- Turtle Custom

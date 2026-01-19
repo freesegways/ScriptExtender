@@ -118,6 +118,15 @@ function IsActionInRange(s) return 1 end
 -- Constants
 BOOKTYPE_SPELL = "spell"
 
+function CreateFrame(type, name, parent, template)
+    -- Return a mock table representing the frame
+    local frame = {}
+    frame.SetOwner = function() end
+    frame.ClearLines = function() end
+    frame.SetPlayerBuff = function() end
+    return frame
+end
+
 -- =========================================================
 -- 2. FILE LOADER (TOC Parser)
 -- =========================================================
