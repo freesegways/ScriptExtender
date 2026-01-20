@@ -35,7 +35,7 @@ function ScriptExtender_GetHighestSpellData(baseName, classToken)
                 elseif string.sub(sName, 1, string.len(baseName)) == baseName then
                     -- Check if it's followed by " (Rank" or is the exact name
                     local remainder = string.sub(sName, string.len(baseName) + 1)
-                    if remainder == "" or string.find(remainder, "^ %PERCENT(Rank %d+%PERCENT)$") or string.find(remainder, "^ %(Rank") then
+                    if remainder == "" or string.find(remainder, "^ %(Rank %d+%)$") then
                         found = true
                     end
                 end
@@ -68,4 +68,71 @@ function ScriptExtender_GetSpellDamage(baseName)
         return data.min
     end
     return 0
+end
+
+--- Finds the SpellID in the spellbook by name.
+-- @param spellName The full name or base name of the spell.
+-- @return The spell ID (integer) or nil.
+local BOOKTYPE_SPELL = "spell"
+
+-- Cache IDs to avoid expensive API loops
+local SpellIDCache = {}
+
+function ScriptExtender_GetSpellID(spellName)
+    -- Required: GetSpellCooldown API needs numeric ID, not name.
+
+    -- Check Cache
+    local cached = SpellIDCache[spellName]
+    if cached then
+        local name = GetSpellName(cached, BOOKTYPE_SPELL)
+        -- Verify base name matches to ensure slot hasn't shifted wildly
+        if name and string.find(spellName, name, 1, true) == 1 then
+            return cached
+        end
+    end
+
+    local i = 1
+    while true do
+        local name, rank = GetSpellName(i, BOOKTYPE_SPELL)
+        if not name then break end
+
+        if name == spellName then
+            SpellIDCache[spellName] = i
+            return i
+        end
+
+        if rank then
+            local fullName = name .. " (" .. rank .. ")"
+            if fullName == spellName then
+                SpellIDCache[spellName] = i
+                return i
+            end
+            -- Support "Name(Rank)" format (No Space)
+            local fullNameNoSpace = name .. "(" .. rank .. ")"
+            if fullNameNoSpace == spellName then
+                SpellIDCache[spellName] = i
+                return i
+            end
+        end
+
+        i = i + 1
+    end
+    return nil
+end
+
+--- Checks if a spell is ready to cast (not on Cooldown).
+-- @param spellName The name of the spell.
+-- @return boolean true if ready, false otherwise.
+function ScriptExtender_IsSpellReady(spellName)
+    local id = ScriptExtender_GetSpellID(spellName)
+    if not id then return true end -- Fail open if spell not found
+
+    local start, duration = GetSpellCooldown(id, BOOKTYPE_SPELL)
+    if start > 0 and duration > 0 then
+        local rem = duration - (GetTime() - start)
+        if rem > 0.1 then
+            return false
+        end
+    end
+    return true
 end

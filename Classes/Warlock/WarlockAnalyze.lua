@@ -145,13 +145,13 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
 
         if hp < lowHpThreshold then
             -- Anti-flee / Low HP Execution phase
-            curseToUse = "Curse of Recklessness (Rank 1)"
+            curseToUse = "Curse of Recklessness(Rank 1)"
             curseTex = "CurseOfRecklessness"
             curseDur = 120
         else
             -- Default to Elements if we use Fire, or Recklessness for physical.
             -- User requested Downranked Recklessness.
-            curseToUse = "Curse of Recklessness (Rank 1)"
+            curseToUse = "Curse of Recklessness(Rank 1)"
             curseTex = "CurseOfRecklessness"
             curseDur = 120
         end
@@ -166,13 +166,29 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
     if agonyDmg == 0 then agonyDmg = 84 end -- Rank 1 fallback
     local corrDmg = ScriptExtender_GetSpellDamage("Corruption")
     if corrDmg == 0 then corrDmg = 40 end   -- Rank 1 fallback
+    local siphonDmg = ScriptExtender_GetSpellDamage("Siphon Life")
+    if siphonDmg == 0 then siphonDmg = 45 end
+
+    -- One DoT Kill Optimization Level Check
+    local pLvl = UnitLevel("player")
+    local tLvl = UnitLevel(u)
+    if tLvl == -1 then tLvl = pLvl + 3 end
+    -- User Rule: "min between plvl*.5 and plvl -10"
+    -- This defines the maximum level of a mob considered "Low Level/Trivial".
+    -- Level 60: Min(30, 50) = 30. (Mobs <= 30 are optimized).
+    -- Level 12: Min(6, 2) = 2.
+    local maxTargetLevel = math.min((pLvl * 0.5), (pLvl - 10))
+    local isLowLevel = (tLvl > 0) and (tLvl <= maxTargetLevel)
 
     local killerDotActive = false
 
     -- Process DoTs
     for x, s in ipairs(DoTs) do
         -- If a DoT is already doing enough damage to kill, stop casting new ones.
-        if killerDotActive then break end
+        -- BUT if we are at a curse slot, we continue (to check if we need to apply curse for utility)
+        local isCurseSlot = (s == "Curse of Agony")
+
+        if killerDotActive and not isCurseSlot then break end
 
         local castName = s      -- The spell we intend to cast
         local trackTex = Tex[x] -- The texture we look for to verify it's up
@@ -182,16 +198,11 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
         -- Filter: Siphon Life
         if s == "Siphon Life" then
             if not hasSiphonLife then
-                -- Skip if we don't have the talent
                 skipCast = true
             else
-                -- Conditions: High HP (Not dying soon), and worth it?
-                -- User: "enemies with a lot of health left" ... "prio on bosses"
-                -- Avoid on mobs that are killed way faster.
-                -- Threshold: HP > 4x Bolt? Or HP > 800?
-                -- Let's use: Not a "Short" target.
-                local isShortFight = (hpVal < (boltDmg * 6))              -- Arbitrary: > 6 bolts to kill is "Long"
-                if isPercentMode then isShortFight = (hpPercent < 50) end -- Rough estimate for % mode
+                -- Avoid Siphon Life on trivial mobs not handled by LowLevel check (e.g. dying fast from bolts)
+                local isShortFight = (hpVal < (boltDmg * 6))
+                if isPercentMode then isShortFight = (hpPercent < 50) end
 
                 local classif = UnitClassification(u)
                 if classif == "worldboss" or classif == "elite" or classif == "rareelite" then
@@ -199,65 +210,56 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
                 end
 
                 if isShortFight then
-                    skipCast = true -- Skip Siphon Life on small mobs
+                    skipCast = true
                 end
             end
         end
 
-        if not skipCast then -- proceeding only if not skipped
-            -- Logic Swap for Curse Slot
-            local isCurseSlot = (s == "Curse of Agony")
+        if not skipCast then
             local maledictionActive = false
 
             if isCurseSlot then
                 if hasMalediction then
                     castName = curseToUse -- Swap Agony for CoR/CoE
                     maledictionActive = true
-                    -- We KEEP 'trackTex' as "CurseOfSargeras" (Agony) because Malediction applies Agony
-                    -- We change duration to 24s effectively because we want to refresh Agony
+                    -- We KEEP 'trackTex' as Agony because Malediction applies Agony visual
                 end
             end
 
             local k = n .. trackTex
             local last = WD_Track[k] or 0
             local elapsed = tm - last
-
-            -- Timer Check:
-            -- Standard: Refresh within 2s of falling off
-            local tmr = (last > 0 and elapsed < (duration - 2))
-
             local hasDot = ScriptExtender_HasDebuff(u, trackTex)
 
             -- SPECIAL CASING FOR MALEDICTION:
-            -- If we are using Malediction, we track Agony Texture (CurseOfSargeras).
-            -- BUT, we also need to respect that our "castName" (Curse of Recklessness) might ALREADY be up.
-            -- However, user requirement is: "if it doesnt find curse of agony it always uses curse of recklessness to refresh it"
-
-            -- So, if Agony (trackTex) is MISSING, we must set hasDot = false, preventing any "skip because present" logic.
-            -- AND we must ensure that we don't skip just because we cast it recently (unless very recently, e.g. < 3s GCD safety).
-            -- The standard 'hasDot' check handles the texture presence.
-
-            -- If Agony is missing (hasDot is false), we proceed to cast 'castName' (CoR/CoE).
-            -- This effectively refreshes Agony.
-
-            -- Is there a risk we recast CoR while CoR is up?
-            -- Yes, but that is INTENDED to refresh Agony.
-            -- "unless the other curse it wants to cast is out" -> No, user says "use that curse to refresh".
-
-            if last > 0 and elapsed < 3 then hasDot = true end -- Anti-spam safety
-
-            -- Calculate if this DoT is a "Killer"
-            local thisDotDmg = 0
-            if isCurseSlot then
-                thisDotDmg = agonyDmg -- Even if casting CoR, source is Agony
-            elseif s == "Corruption" then
-                thisDotDmg = corrDmg
-            elseif s == "Siphon Life" then
-                thisDotDmg = siphonDmg
+            -- If we use Malediction, we track Agony Texture (CurseOfSargeras).
+            if maledictionActive and not hasDot then
+                -- Check latency protection via tracker (Index 2 is Agony)
+                local k2 = n .. Tex[2]
+                local last2 = WD_Track[k2] or 0
+                local el2 = tm - last2
+                if last2 > 0 and el2 < 1.5 then hasDot = true end
+            elseif not hasDot then
+                -- Standard latency protection
+                if last > 0 and elapsed < 1.5 then hasDot = true end
             end
 
-            if hasDot then
-                -- Check if remaining damage is enough to kill
+            if hasDot and last == 0 then elapsed = 0 end
+
+            -- KILLER CHECK LOGIC (Restored & Gated by Level)
+            -- If existing dot kills the mob, we shouldn't waste mana on more dots.
+            -- STRICTLY ONLY FOR LOW LEVEL MOBS.
+            if hasDot and isLowLevel then
+                local thisDotDmg = 0
+                if isCurseSlot then
+                    thisDotDmg = agonyDmg
+                elseif s == "Corruption" then
+                    thisDotDmg = corrDmg
+                elseif s == "Siphon Life" then
+                    thisDotDmg = siphonDmg
+                end
+
+                -- Check remaining damage capability
                 local safeElapsed = elapsed
                 if safeElapsed < 0 then safeElapsed = 0 end
                 if safeElapsed < duration then
@@ -269,30 +271,44 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
                 end
             end
 
+            -- REFRESH LOGIC:
+            local shouldCast = false
+
+            if not hasDot then
+                shouldCast = true
+            elseif last > 0 and elapsed > (duration - 3) and elapsed < (duration + 5) then
+                shouldCast = true
+            end
+
             -- Do not cast Long DoTs if target is about to die
             local isLongDoT = (duration > 15)
             local timeToDieShort = (hpVal < boltDmg)
 
             if isLongDoT and timeToDieShort and not string.find(castName, "Recklessness") then
-                -- Skip casting full Agony/Immolate if mob is 1-shot by a bolt
-            elseif not hasDot then
-                -- Single DoT Kill Logic Check
-                local wouldKill = (thisDotDmg > hpVal)
+                shouldCast = false
+            end
 
-                if not tmr then
+            -- Single DoT Kill Logic Check
+            if shouldCast then
+                -- if killerDotActive (from previous dots) we skip, UNLESS it's a curse
+                if killerDotActive and not isCurseSlot then
+                    shouldCast = false
+                end
+
+                if shouldCast then
+                    local wouldKill = false
+                    local thisDotDmg = 0
+                    if isCurseSlot then
+                        thisDotDmg = agonyDmg
+                    elseif s == "Corruption" then
+                        thisDotDmg = corrDmg
+                    elseif s == "Siphon Life" then
+                        thisDotDmg = siphonDmg
+                    end
+
+                    if thisDotDmg > hpVal then wouldKill = true end
+
                     local score = (prio >= 2 and 80 or 20)
-
-                    -- Optimization: Only prioritize "One DoT Kill" on significantly lower-level mobs
-                    -- Formula: TargetLevel <= Min(PlayerLevel / 2, PlayerLevel - 10)
-                    -- Ensures we prio the "biggest level diff" requirement (either 10 levels or half, whichever is stricter).
-
-                    local pLvl = UnitLevel("player")
-                    local tLvl = UnitLevel(u)
-                    if tLvl == -1 then tLvl = pLvl + 3 end -- Treat bosses as high level
-
-                    local maxTargetLevel = math.min((pLvl * 0.5), (pLvl - 10))
-
-                    local isLowLevel = (tLvl > 0) and (tLvl <= maxTargetLevel)
 
                     if wouldKill and isLowLevel then
                         score = score + 50
@@ -321,7 +337,7 @@ function ScriptExtender_Warlock_UpdateTracker(s, n, tm)
     end
     -- Check for Malediction swaps (CoR/CoE update Agony timer)
     if string.find(s, "Curse of Recklessness") or string.find(s, "Curse of the Elements") then
-        -- Update Curse of Agony slot (Index 1)
-        WD_Track[n .. Tex[1]] = tm
+        -- Update Curse of Agony slot (Index 2 for Agony/Sargeras)
+        WD_Track[n .. Tex[2]] = tm
     end
 end

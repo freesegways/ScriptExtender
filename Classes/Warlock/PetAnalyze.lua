@@ -1,12 +1,12 @@
 -- Classes/Warlock/PetAnalyze.lua
 -- Analysis logic for Warlock pet automation.
 
-function ScriptExtender_Warlock_PetAnalyze(u, strict, tm)
+function ScriptExtender_Warlock_PetAnalyze(u, forceOOC, tm)
     local P = "player"
     if not UnitExists(u) or UnitIsDead(u) or UnitIsFriend(P, u) then return nil, nil, -999 end
 
-    -- strict=true means "Ignore this mob if it is not in combat"
-    if strict and not UnitAffectingCombat(u) then return nil, nil, -999 end
+    -- forceOOC=true allows OOC targets. If false, we require combat.
+    if not forceOOC and not UnitAffectingCombat(u) then return nil, nil, -999 end
 
     -- CC Check (Using global CC list)
     for i = 1, 16 do
@@ -28,9 +28,14 @@ function ScriptExtender_Warlock_PetAnalyze(u, strict, tm)
     -- Skull(8)=40, Cross(7)=30, Others=20
     local score = (m == 8 and 40) or (m == 7 and 30) or 20
 
-    -- Higher priority if the target is attacking the player
+    -- Higher priority if the target is attacking the player (Tanking is #1 job)
     if UnitIsUnit(u .. "target", P) then
         score = score + 50
+    end
+
+    -- Stickiness: Prefer current target to avoid ping-ponging
+    if UnitExists("pettarget") and UnitIsUnit(u, "pettarget") then
+        score = score + 15
     end
 
     return "PetAttack", "pet", score

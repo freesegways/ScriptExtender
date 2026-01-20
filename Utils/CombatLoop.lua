@@ -20,7 +20,7 @@ function ScriptExtender_RunCombatLoop(actors)
         local u = "target"
         local n = UnitName(u)
         for idx, actor in ipairs(actors) do
-            local action, type, score = actor.analyzer(u, false, tm) -- Strict=FALSE
+            local action, type, score = actor.analyzer(u, true, tm) -- ForceOOC=TRUE (Allow manual start)
             if score and score > best[idx].score then
                 best[idx] = { score = score, action = action, type = type, targetName = n, strict = false }
             end
@@ -28,7 +28,20 @@ function ScriptExtender_RunCombatLoop(actors)
     end
 
     -- 2. AUTO SCANNING
-    if not actors.disableScan then
+    -- Check if we found a valid manual target action (Manual Override)
+    local manualOverride = false
+    for idx, b in ipairs(best) do
+        if b.targetName and b.targetName == UnitName("target") then
+            -- If manual target is OOC, we override scan (Player wants to pull this specific mob)
+            -- If manual target is IN COMBAT, we allow scan to proceed (Check for better targets like Healers)
+            if not UnitAffectingCombat("target") then
+                manualOverride = true
+            end
+            break
+        end
+    end
+
+    if not actors.disableScan and not manualOverride then
         for i = 1, 25 do
             TargetNearestEnemy()
             local u = "target"
@@ -40,8 +53,8 @@ function ScriptExtender_RunCombatLoop(actors)
 
             if valid then
                 for idx, actor in ipairs(actors) do
-                    -- Pass strict=true to analyzers if in combat
-                    local action, type, score = actor.analyzer(u, true, tm)
+                    -- Pass ForceOOC=FALSE (Strict) to prevent auto-pulling OOC mobs
+                    local action, type, score = actor.analyzer(u, false, tm)
 
                     if score and score > best[idx].score then
                         -- Track max priority ...
@@ -68,7 +81,10 @@ function ScriptExtender_RunCombatLoop(actors)
             local function VerifyTarget()
                 -- If strictly required combat, check it. If strict=false (Manual), allow OOC.
                 if not b.strict or UnitAffectingCombat("target") then
-                    local newAct, _, newScore = actor.analyzer("target", b.strict, tm)
+                    -- Analyzer expects 'forceOOC'.
+                    -- If strict=false (Manual/AllowOOC), forceOOC should be TRUE.
+                    -- If strict=true (Scan/CombatOnly), forceOOC should be FALSE.
+                    local newAct, _, newScore = actor.analyzer("target", not b.strict, tm)
                     if newScore and newScore >= (b.score - 10) and newAct == b.action then
                         return true
                     end

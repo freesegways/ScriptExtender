@@ -17,8 +17,10 @@ function AutoWarlock()
             -- Player Task
             analyzer = ScriptExtender_Warlock_Analyze,
             onExecute = function(action, targetName, tm)
-                CastSpellByName(action)
-                ScriptExtender_Warlock_UpdateTracker(action, targetName, tm)
+                if ScriptExtender_IsSpellReady(action) then
+                    CastSpellByName(action)
+                    ScriptExtender_Warlock_UpdateTracker(action, targetName, tm)
+                end
             end
         },
         {

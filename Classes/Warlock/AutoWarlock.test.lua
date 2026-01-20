@@ -148,6 +148,9 @@ ScriptExtender_Tests["AutoWarlock_ManualTarget_OOC"] = function(t)
     local castSpells = {}
     local currentTarget = nil
 
+    -- Mock Cooldowns
+    t.Mock("GetSpellCooldown", function() return 0, 0, 1 end)
+
     -- Scenario: Player in Combat. Target is OOC.
     -- Expected: Attack the OOC target because we manually selected it.
     local mob = { name = "Peaceful", combat = false }
