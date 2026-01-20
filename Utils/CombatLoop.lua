@@ -58,7 +58,7 @@ function ScriptExtender_RunCombatLoop(actors)
 
                     if score and score > best[idx].score then
                         -- Track max priority ...
-                        if type == "kill" or type == "dot" or type == "fill" then
+                        if type == "kill" or type == "fill" then
                             local prio = ScriptExtender_GetTargetPriority(u)
                             if prio > maxPrioSeen then maxPrioSeen = prio end
                             if prio == 1 and maxPrioSeen >= 2 then score = -999 end

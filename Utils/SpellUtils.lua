@@ -136,3 +136,12 @@ function ScriptExtender_IsSpellReady(spellName)
     end
     return true
 end
+
+--- Checks if a specific spell (and rank) is learned in the spellbook.
+-- @param spellName The exact name of the spell (e.g., "Create Healthstone (Major)").
+-- @return boolean true if learned.
+function ScriptExtender_IsSpellLearned(spellName)
+    local id = ScriptExtender_GetSpellID(spellName)
+    if id then return true end
+    return false
+end

@@ -59,6 +59,8 @@ function UnitExists(u) return true end
 
 function UnitIsConnected(u) return true end
 
+function UnitCreatureType(u) return "Humanoid" end
+
 function UnitIsDeadOrGhost(u) return false end
 
 function UnitCanAssist(u) return true end
@@ -114,6 +116,12 @@ function UnitManaMax(u) return 100 end
 function UnitAffectingCombat(u) return false end
 
 function IsActionInRange(s) return 1 end
+
+function GetNumPartyMembers() return 0 end
+
+function GetNumRaidMembers() return 0 end
+
+function UnitClassification(u) return "normal" end
 
 -- Constants
 BOOKTYPE_SPELL = "spell"

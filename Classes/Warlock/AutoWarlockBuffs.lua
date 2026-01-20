@@ -13,6 +13,8 @@ function AutoWarlockBuffs(m)
     local _, pClass = UnitClass("player")
 
     -- Configuration
+    -- Item Type: 'item_hold' means we want to HAVE the item in bags.
+    -- Item Type: 'item_use' (like Felstone) means we want the BUFF from the item.
     local BUFFS = {
         {
             -- 1. Demon Armor / Demon Skin
@@ -27,12 +29,35 @@ function AutoWarlockBuffs(m)
             buffName = "Unending Breath"
         },
         {
-            -- 3. Felstone
-            type = "item",
-            buffName = "Felstone",
+            -- 3. Felstone (Spellstone/Firestone generic logic placeholder - user specifically asked for Healthstones)
+            -- Actually, Felstone gives a buff.
+            type = "item_use",
+            buffName = "Felstone", -- Check exact buff name in game if possible
             itemName = "Felstone",
             createSpell = "Create Felstone",
             reagent = "Soul Shard"
+        },
+        {
+            -- 4. Healthstone
+            type = "item_hold",
+            -- List generic names to matching specific ranks?
+            -- We'll just list the Create Spells in priority order.
+            createSpells = {
+                "Create Healthstone (Major)",
+                "Create Healthstone (Greater)",
+                "Create Healthstone",
+                "Create Healthstone (Lesser)",
+                "Create Healthstone (Minor)"
+            },
+            -- The resulting items usually match the suffix, but we need to check if we HAVE it.
+            -- Map Spell -> Item Name
+            map = {
+                ["Create Healthstone (Major)"] = "Major Healthstone",
+                ["Create Healthstone (Greater)"] = "Greater Healthstone",
+                ["Create Healthstone"] = "Healthstone",
+                ["Create Healthstone (Lesser)"] = "Lesser Healthstone",
+                ["Create Healthstone (Minor)"] = "Minor Healthstone"
+            }
         }
     }
 
@@ -93,8 +118,8 @@ function AutoWarlockBuffs(m)
                     return -- One action per tick
                 end
             end
-        elseif buffDef.type == "item" then
-            -- Handle Item Buffs (Felstone)
+        elseif buffDef.type == "item_use" then
+            -- Handle Item Buffs (Felstone) - Check if we have the BUFF
             local hasIt, rem = HasBuff("player", buffDef.buffName)
 
             if not hasIt or rem < 300 then
@@ -114,12 +139,38 @@ function AutoWarlockBuffs(m)
                                 CastSpellByName(buffDef.createSpell)
                                 ScriptExtender_Print("AutoBuff: Creating " .. buffDef.itemName)
                                 return
-                            else
-                                ScriptExtender_Print("AutoBuff: OOM for " .. buffDef.createSpell)
+                            end
+                        end
+                    end
+                end
+            end
+        elseif buffDef.type == "item_hold" then
+            -- Handle Items we just want to POSSESS (Healthstone)
+            -- Iterate spells to find the best one we can cast
+            for _, spellName in ipairs(buffDef.createSpells) do
+                if ScriptExtender_IsSpellLearned(spellName) then
+                    local itemName = buffDef.map[spellName]
+                    local b, s = FindItemInBag(itemName)
+
+                    if not b then
+                        -- We don't have it. Create it.
+                        -- Check Shard
+                        local rb, rs = FindItemInBag("Soul Shard")
+                        if rb and rs then
+                            -- Check Mana (Estimating cost or just trying)
+                            if UnitMana("player") > 200 then
+                                CastSpellByName(spellName)
+                                ScriptExtender_Print("AutoBuff: Creating " .. itemName)
+                                return -- Stop after one action
                             end
                         else
-                            ScriptExtender_Print("AutoBuff: Missing " .. buffDef.reagent)
+                            -- No Shard, can't make it.
+                            ScriptExtender_Print("AutoBuff: Need Shard for " .. itemName)
+                            return
                         end
+                    else
+                        -- We have this rank.
+                        -- User Request: Continue to check lower ranks to stack multiple unique Healthstones.
                     end
                 end
             end

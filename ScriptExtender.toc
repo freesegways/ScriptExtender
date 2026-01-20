@@ -83,3 +83,4 @@ Classes\Warlock\AutoPet.lua
 Classes\Warlock\AutoWarlock.lua
 Classes\Warlock\AutoWarlock.test.lua
 Classes\Warlock\WarlockAnalyze.test.lua
+Classes\Warlock\WarlockAnalyze_Group.test.lua

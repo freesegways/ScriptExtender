@@ -120,10 +120,10 @@ ScriptExtender_Tests["WarlockAnalyze_Manual_OOC"] = function(t)
     t.Mock("UnitIsFriend", function(u) return false end)
     t.Mock("UnitAffectingCombat", function(u) return false end) -- OOC
     t.Mock("UnitName", function(u) return "Peaceful" end)
-    t.Mock("UnitHealth", function(u) return 100 end)
-    t.Mock("UnitHealthMax", function(u) return 100 end)
-    t.Mock("UnitMana", function(u) return 100 end)
-    t.Mock("UnitManaMax", function(u) return 100 end)
+    t.Mock("UnitHealth", function(u) return 2000 end)           -- High HP to avoid short fight logic
+    t.Mock("UnitHealthMax", function(u) return 2000 end)
+    t.Mock("UnitMana", function(u) return 1000 end)
+    t.Mock("UnitManaMax", function(u) return 1000 end)
     t.Mock("UnitPowerType", function(u) return 0 end)
     t.Mock("UnitCreatureFamily", function(u) return "Imp" end)
     t.Mock("UnitLevel", function(u) return 60 end)
@@ -146,7 +146,7 @@ ScriptExtender_Tests["WarlockAnalyze_Manual_OOC"] = function(t)
 
     t.Assert(act ~= nil, "Analyzer SHOULD return action for OOC target if forceOOC is true.")
     -- Expect Siphon Life (First DoT)
-    t.AssertEqual("Siphon Life", act, "Should open with Siphon Life.")
+    t.AssertEqual(act, "Siphon Life", "Should open with Siphon Life.")
 
     -- Call with ForceOOC = FALSE (Should fail)
     local act2, _, _ = ScriptExtender_Warlock_Analyze("target", false, 1000)
