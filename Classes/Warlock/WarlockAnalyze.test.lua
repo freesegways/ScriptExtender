@@ -148,7 +148,9 @@ ScriptExtender_Tests["WarlockAnalyze_Manual_OOC"] = function(t)
     -- Expect Siphon Life (First DoT)
     t.AssertEqual(act, "Siphon Life", "Should open with Siphon Life.")
 
-    -- Call with ForceOOC = FALSE (Should fail)
+    -- Call with ForceOOC = FALSE
+    -- Logic Update: If unit is TARGET, we allow OOC Analysis (Pulling logic).
+    -- So this should NOW return an action (Siphon Life), not nil.
     local act2, _, _ = ScriptExtender_Warlock_Analyze("target", false, 1000)
-    t.Assert(act2 == nil, "Analyzer SHOULD return nil for OOC target if forceOOC is false.")
+    t.AssertEqual(act2, "Siphon Life", "Analyzer SHOULD return action (Pull) for OOC target if it is the current target.")
 end

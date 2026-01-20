@@ -12,7 +12,9 @@ local Dur = { 30, 24, 18, 15 }
 function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
     local pl = "player"
     if not UnitExists(u) or UnitIsDead(u) or UnitIsFriend(pl, u) then return nil, nil, -1000 end
-    if not forceOOC and not UnitAffectingCombat(u) then return nil, nil, -1000 end
+    if not forceOOC and not UnitAffectingCombat(u) and not UnitIsUnit(u, "target") then
+        return nil, nil, -1000
+    end
 
     local mark = GetRaidTargetIndex(u)
     local SafeTime = 5
