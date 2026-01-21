@@ -47,9 +47,6 @@ ScriptExtender_Tests["WarlockAnalyze_Marks"] = function(t)
     currentMark = 7
     local act, type, scoreCross = ScriptExtender_Warlock_Analyze("target", false, 1000)
 
-    print("DEBUG: Scores -> Skull: " ..
-        tostring(scoreSkull) .. ", Cross: " .. tostring(scoreCross) .. ", None: " .. tostring(scoreNone))
-
     -- Assert Specific Values to confirm calculation logic
     -- Base Scores: Skull=105, Cross=100, None=90
     -- Decay: -5 (Index 1)

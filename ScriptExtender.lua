@@ -30,6 +30,7 @@ SLASH_SCRIPTEXTENDER1 = "/se"
 SLASH_SCRIPTEXTENDER2 = "/scriptextender"
 SlashCmdList["SCRIPTEXTENDER"] = function(msg)
     local _, _, cmd, rest = string.find(msg, "^%s*(%S+)(.*)")
+    ScriptExtender_Log("DEBUG: Received command: " .. tostring(cmd))
 
     if not cmd or cmd == "" or string.lower(cmd) == "help" then
         ScriptExtender_Help()
@@ -51,7 +52,13 @@ SlashCmdList["SCRIPTEXTENDER"] = function(msg)
         local func = getglobal(cmdData.name)
 
         if type(func) == "function" then
-            func(rest)
+            ScriptExtender_Log("DEBUG: Calling function " .. cmdData.name)
+            local status, err = pcall(func, rest)
+            if not status then
+                ScriptExtender_Print("ERROR calling " .. cmdData.name .. ": " .. tostring(err))
+            else
+                ScriptExtender_Log("DEBUG: Function return successfully")
+            end
         else
             ScriptExtender_Print("Error: Function " .. tostring(cmdData.name) .. " not found.")
         end
