@@ -146,31 +146,45 @@ function AutoWarlockBuffs(m)
             end
         elseif buffDef.type == "item_hold" then
             -- Handle Items we just want to POSSESS (Healthstone)
-            -- Iterate spells to find the best one we can cast
-            for _, spellName in ipairs(buffDef.createSpells) do
-                if ScriptExtender_IsSpellLearned(spellName) then
-                    local itemName = buffDef.map[spellName]
+            -- We want to try and hold one of EACH rank if possible (user requested "create all healthstones")
+
+            for _, friendlyName in ipairs(buffDef.createSpells) do
+                -- Use the Rank name for searching the spellbook
+                local searchName = friendlyName
+
+                -- Check if we know this spell by trying to find it in the book
+                -- FindSpells returns a table of matches: {{name="...", index=123}, ...}
+                local results = FindSpells(searchName)
+
+                if results and results[1] then
+                    -- We know this spell!
+                    local spellIndex = results[1].index
+
+                    local itemName = buffDef.map[friendlyName]
                     local b, s = FindItemInBag(itemName)
 
                     if not b then
-                        -- We don't have it. Create it.
+                        -- We don't have this specific Healthstone rank. Check resources and craft it.
                         -- Check Shard
                         local rb, rs = FindItemInBag("Soul Shard")
                         if rb and rs then
                             -- Check Mana (Estimating cost or just trying)
                             if UnitMana("player") > 200 then
-                                CastSpellByName(spellName)
-                                ScriptExtender_Print("AutoBuff: Creating " .. itemName)
+                                ScriptExtender_Print("AutoBuff: Attempting to create " .. itemName)
+
+                                -- Cast using the index we found
+                                CastSpell(spellIndex, "spell")
                                 return -- Stop after one action
+                            else
+                                -- OOM, wait for next tick
                             end
                         else
                             -- No Shard, can't make it.
-                            ScriptExtender_Print("AutoBuff: Need Shard for " .. itemName)
+                            -- If we have no shards, we can't make *any* HS, so we should probably stop.
                             return
                         end
                     else
-                        -- We have this rank.
-                        -- User Request: Continue to check lower ranks to stack multiple unique Healthstones.
+                        -- We have this rank. Continue loop to check for other ranks (stacking unique HS)
                     end
                 end
             end

@@ -1,30 +1,46 @@
 -- Utils/FindSpell.lua
 
-local BOOKTYPE_SPELL = "spell"
-
 --- Searches for spells matching the query string in the Spellbook and internal DB.
 -- @param msg The query string.
-function FindSpell(msg)
-    ScriptExtender_Log("DEBUG: FindSpell executing with: " .. tostring(msg))
+-- @return a table of matches {name, index}
+function FindSpells(msg)
+    if not msg then return {} end
+    -- Trim leading/trailing whitespace
+    local query = string.gsub(msg, "^%s*(.-)%s*$", "%1")
+    query = string.lower(query)
 
-    local query = string.lower(msg)
-    -- Ignore tokenization for now, just search for raw string match
-    ScriptExtender_Print("Searching Spellbook for: " .. query)
+    if query == "" then
+        ScriptExtender_Print("Usage: /se findspell <name>")
+        return {}
+    end
 
+    local results = {}
+    local found = false
     local i = 1
     while true do
-        local name, rank = GetSpellName(i, BOOKTYPE_SPELL)
+        local name, rank = GetSpellName(i, "spell")
         if not name then break end
 
         local fullName = name
-        if rank then fullName = fullName .. " (" .. rank .. ")" end
+        if rank and rank ~= "" then
+            fullName = fullName .. " (" .. rank .. ")"
+        end
 
-        -- Simple check: does the name contain the query text?
         if string.find(string.lower(fullName), query, 1, true) then
-            ScriptExtender_Print(string.format("ID: %d | %s", i, fullName))
+            table.insert(results, { name = fullName, index = i })
+
+            -- Only print in debug mode
+            ScriptExtender_Log(string.format("Index: %d | %s", i, fullName))
+            found = true
         end
         i = i + 1
     end
+
+    if not found then
+        ScriptExtender_Log("No spells found matching '" .. query .. "'.")
+    end
+
+    return results
 end
 
-ScriptExtender_Register("FindSpell", "Search for a spell by name (Smart Match).")
+ScriptExtender_Register("FindSpells", "Search for a spell by name (Smart Match). Return: Table of matches.")

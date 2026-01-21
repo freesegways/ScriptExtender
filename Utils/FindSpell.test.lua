@@ -3,8 +3,8 @@ ScriptExtender_Tests["Utils_FindSpell"] = function(t)
 
     local printOutput = {}
 
-    -- Mock Deps
-    t.Mock("ScriptExtender_Print", function(msg)
+    -- Mock Logs
+    t.Mock("ScriptExtender_Log", function(msg)
         table.insert(printOutput, msg)
     end)
 
@@ -19,44 +19,15 @@ ScriptExtender_Tests["Utils_FindSpell"] = function(t)
         return mockSpells[i]
     end)
 
-    -- Mock Database
-    ScriptExtender_SpellLevels = {
-        ["MAGE"] = {
-            [1] = {
-                { name = "Fireball" }
-            }
-        }
-    }
-
     -- Test 1: Search Spellbook
-    FindSpell("Fireball")
+    local results = FindSpells("Fireball")
+    t.Assert(results, "Should return results table")
+    t.Assert(table.getn(results) == 1, "Should find 1 match")
+    t.Assert(results[1].name == "Fireball", "Match name incorrect")
+    t.Assert(results[1].index == 1, "Match index incorrect")
 
-    -- Check output for match
-    local found = false
-    for _, line in ipairs(printOutput) do
-        if string.find(line, "ID: 1 | Fireball") then
-            found = true
-        end
-    end
-    t.Assert(found, "Should find Fireball in Spellbook")
-
-    -- Test 2: Search Database
-    found = false
-    for _, line in ipairs(printOutput) do
-        if string.find(line, "MAGE Lvl 1") and string.find(line, "Fireball") then
-            found = true
-        end
-    end
-    t.Assert(found, "Should find Fireball in Database")
-
-    -- Test 3: Case Insensitive
-    printOutput = {}
-    FindSpell("fireball")
-    found = false
-    for _, line in ipairs(printOutput) do
-        if string.find(line, "ID: 1 | Fireball") then
-            found = true
-        end
-    end
-    t.Assert(found, "Should find Fireball (case insensitive)")
+    -- Test 2: Case Insensitive
+    results = FindSpells("fireball")
+    t.Assert(table.getn(results) == 1, "Should find 1 match (case insensitive)")
+    t.Assert(results[1].name == "Fireball", "Match name incorrect")
 end

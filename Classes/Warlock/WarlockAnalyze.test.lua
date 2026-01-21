@@ -154,3 +154,57 @@ ScriptExtender_Tests["WarlockAnalyze_Manual_OOC"] = function(t)
     local act2, _, _ = ScriptExtender_Warlock_Analyze("target", false, 1000)
     t.AssertEqual(act2, "Siphon Life", "Analyzer SHOULD return action (Pull) for OOC target if it is the current target.")
 end
+
+ScriptExtender_Tests["AutoWarlockBuffs_Healthstones"] = function(t)
+    -- This test verifies that removing the redundant RankMap didn't break Healthstone creation logic.
+
+    -- 1. Setup Data
+    local calledCast = nil
+
+    -- 2. Mock Global Dependencies
+    t.Mock("UnitClass", function(u) return "Warlock", "WARLOCK" end)
+    t.Mock("UnitMana", function(u) return 500 end) -- Enough mana
+    t.Mock("ScriptExtender_IsSpellLearned", function(spell) return true end)
+
+    -- Mock Bag: No Healthstones, but have Soul Shard
+    -- Logic in AutoWarlockBuffs: FindItemInBag checks GetContainerItemLink.
+    t.Mock("GetContainerNumSlots", function(b) return 1 end)
+
+    -- We need to ensure we DO NOT find "Major Healthstone" (so we craft it)
+    -- But we DO find "Soul Shard" (reagent)
+    t.Mock("GetContainerItemLink", function(b, s)
+        -- Simulating Slot 1 (b=0, s=1) having Soul Shard
+        if b == 0 and s == 1 then
+            return "|cff9d9d9d|Hitem:6265:0:0:0|h[Soul Shard]|h|r"
+        end
+        return nil
+    end)
+
+    -- Mock FindSpells to return success for "Create Healthstone (Major)"
+    -- This simulates that we know the spell.
+    t.Mock("FindSpells", function(name)
+        -- Ensure we can find the spell when searched
+        if name == "Create Healthstone (Major)" then
+            return { { name = "Create Healthstone (Major)", index = 10 } }
+        end
+        return {}
+    end)
+
+    t.Mock("CastSpell", function(id, book)
+        if id == 10 then
+            calledCast = "Create Healthstone (Major)"
+        end
+    end)
+
+    t.Mock("ScriptExtender_Print", function(msg) end)
+
+    -- Mock HasBuff (used in AutoWarlockBuffs) via GetPlayerBuff
+    t.Mock("GetPlayerBuff", function(i, filter) return -1 end) -- No buffs
+
+    -- 3. Run Function
+    AutoWarlockBuffs()
+
+    -- 4. Assert
+    t.AssertEqual("Create Healthstone (Major)", calledCast,
+        "Should attempt to cast Create Healthstone (Major) when found in spellbook.")
+end
