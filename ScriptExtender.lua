@@ -18,11 +18,30 @@ function ScriptExtender_Print(msg)
 end
 
 -- Register a function for the Help command
-function ScriptExtender_Register(name, description)
+function ScriptExtender_Register(name, description, category)
     local key = string.lower(name)
-    ScriptExtender_Commands[key] = { name = name, desc = description }
+
+    if not category then
+        category = "Unknown"
+        -- Try to infer from debug info if available, but safeguard against errors
+        if debug and debug.getinfo then
+            local status, info = pcall(debug.getinfo, 2, "S")
+            if status and info and info.source then
+                -- Extract path after ScriptExtender
+                local src = string.gsub(info.source, "\\", "/")
+                if string.sub(src, 1, 1) == "@" then
+                    src = string.sub(src, 2)
+                end
+
+                local _, _, msg = string.find(src, "ScriptExtender/(.*)/[^/]+%.lua$")
+                if msg then category = msg end
+            end
+        end
+    end
+
+    ScriptExtender_Commands[key] = { name = name, desc = description, category = category }
     -- We'll log to debug instead of chat to avoid cluttering at login
-    ScriptExtender_Log("Registered: " .. name)
+    ScriptExtender_Log("Registered: " .. name .. " [" .. category .. "]")
 end
 
 -- Slash Command Handler

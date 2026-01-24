@@ -13,6 +13,30 @@ local function HasDebuff(textureName)
     return false
 end
 
+local function HasBuff(textureName)
+    local i = 1
+    while UnitBuff("player", i) do
+        local b = UnitBuff("player", i)
+        if b and string.find(b, textureName) then return true end
+        i = i + 1
+    end
+    return false
+end
+
+local function IsPetSpellReady(spellName)
+    local i = 1
+    while true do
+        local name, rank = GetSpellName(i, BOOKTYPE_PET)
+        if not name then break end
+        if name == spellName then
+            local start, duration = GetSpellCooldown(i, BOOKTYPE_PET)
+            if start == 0 then return true end
+        end
+        i = i + 1
+    end
+    return false
+end
+
 local function IsSpellReady(spellName)
     local i = 1
     while true do
@@ -65,73 +89,120 @@ end
 
 -- --- CLASS DEFENSIVES ---
 
-local function CastClassDefensive()
+local function CastClassDefensive(mobCount, hpPct)
     local _, class = UnitClass("player")
+    -- Default hpPct if not provided (safety)
+    if not hpPct then hpPct = UnitHealth("player") / UnitHealthMax("player") end
 
     if class == "PRIEST" then
-        if not HasDebuff("AshesToAshes") and not HasDebuff("Spell_Holy_PowerWordShield") then
+        if hpPct < 0.45 and not HasDebuff("AshesToAshes") and not HasDebuff("Spell_Holy_PowerWordShield") then
             CastSpellByName("Power Word: Shield")
             return true
         end
-        if IsSpellReady("Desperate Prayer") then
+        if hpPct < 0.35 and IsSpellReady("Desperate Prayer") then
             CastSpellByName("Desperate Prayer")
             return true
         end
-        if IsSpellReady("Fade") then
+        if hpPct < 0.40 and mobCount > 0 and IsSpellReady("Fade") then
             CastSpellByName("Fade")
             return true
         end
     elseif class == "MAGE" then
-        if IsSpellReady("Ice Barrier") then
+        -- Ice Barrier (50%)
+        if hpPct < 0.50 and IsSpellReady("Ice Barrier") then
             CastSpellByName("Ice Barrier")
             return true
         end
-        if IsSpellReady("Mana Shield") and (UnitMana("player") / UnitManaMax("player") > 0.4) then
+        -- Mana Shield (35%)
+        if hpPct < 0.35 and IsSpellReady("Mana Shield") and (UnitMana("player") / UnitManaMax("player") > 0.4) then
             CastSpellByName("Mana Shield")
             return true
         end
-        if IsSpellReady("Ice Block") then
+        -- Ice Block (20%)
+        if hpPct < 0.20 and IsSpellReady("Ice Block") then
             CastSpellByName("Ice Block")
             return true
         end
     elseif class == "WARRIOR" then
-        if IsSpellReady("Last Stand") then
+        if hpPct < 0.30 and IsSpellReady("Last Stand") then
             CastSpellByName("Last Stand")
             return true
         end
-        if IsSpellReady("Shield Wall") then
+        if hpPct < 0.25 and IsSpellReady("Shield Wall") then
             CastSpellByName("Shield Wall")
             return true
         end
     elseif class == "ROGUE" then
-        if IsSpellReady("Evasion") then
+        if hpPct < 0.45 and IsSpellReady("Evasion") then
             CastSpellByName("Evasion")
             return true
         end
-        if IsSpellReady("Blind") and UnitExists("target") then
+        if hpPct < 0.35 and IsSpellReady("Blind") and UnitExists("target") then
             CastSpellByName("Blind")
             return true
         end
-        if IsSpellReady("Vanish") then
+        if hpPct < 0.20 and IsSpellReady("Vanish") then
             CastSpellByName("Vanish")
             return true
         end
     elseif class == "HUNTER" then
-        if IsSpellReady("Deterrence") then
+        if hpPct < 0.40 and IsSpellReady("Deterrence") then
             CastSpellByName("Deterrence")
             return true
         end
-        if IsSpellReady("Feign Death") then
+        if hpPct < 0.20 and IsSpellReady("Feign Death") then
             CastSpellByName("Feign Death")
             return true
         end
     elseif class == "PALADIN" then
-        if IsSpellReady("Divine Shield") and not HasDebuff("Banish") then
-            CastSpellByName("Divine Shield")
-            return true
+        local isTank = HasBuff("SealOfFury") or HasBuff("RighteousFury")
+
+        if isTank then
+            -- TANK MODE: Use Lay on Hands as last resort (15%).
+            if hpPct < 0.15 and IsSpellReady("Lay on Hands") then
+                CastSpellByName("Lay on Hands")
+                return true
+            end
+        else
+            -- NORMAL MODE
+            if hpPct < 0.35 and IsSpellReady("Divine Shield") and not HasDebuff("Banish") then
+                CastSpellByName("Divine Shield")
+                return true
+            end
+            if hpPct < 0.35 and IsSpellReady("Divine Protection") and not HasDebuff("Banish") then
+                CastSpellByName("Divine Protection")
+                return true
+            end
+            if hpPct < 0.10 and IsSpellReady("Lay on Hands") then
+                CastSpellByName("Lay on Hands")
+                return true
+            end
         end
-        if IsSpellReady("Divine Protection") and not HasDebuff("Banish") then
-            CastSpellByName("Divine Protection")
+    elseif class == "WARLOCK" then
+        -- 1. Voidwalker Sacrifice
+        -- Condition: 3+ mobs OR < 30% HP
+        if (mobCount and mobCount >= 3) or hpPct < 0.30 then
+            if UnitExists("pet") and not UnitIsDead("pet") and IsPetSpellReady("Sacrifice") then
+                CastSpellByName("Sacrifice")
+                return true
+            end
+        end
+
+        -- 2. Spellstone (35%)
+        if hpPct < 0.35 then
+            local link = GetInventoryItemLink("player", 17)
+            if link and string.find(link, "Spellstone") then
+                local start, dur, enable = GetInventoryItemCooldown("player", 17)
+                if start == 0 and enable == 1 then
+                    UseInventoryItem(17)
+                    return true
+                end
+            end
+        end
+
+        -- 3. Death Coil (35%)
+        if hpPct < 0.35 and IsSpellReady("Death Coil") and UnitExists("target") and UnitCanAttack("player", "target") then
+            CastSpellByName("Death Coil")
             return true
         end
     end
@@ -142,6 +213,16 @@ end
 
 ScriptExtender_Register("UseSurvival", "Uses Class Defensives, Healthstones, or Potions based on Critical Health.")
 function UseSurvival()
+    -- MOB SCAN (Distribution)
+    local totalMobs, dist = 0, {}
+    if GetMobDistribution then
+        totalMobs, dist = GetMobDistribution()
+    end
+    local mobsOnMe = dist["player"] or 0
+    if mobsOnMe > 0 then
+        ScriptExtender_Log("Survival: Mobs attacking me: " .. mobsOnMe)
+    end
+
     local hp_max = UnitHealthMax('player')
     local hp_current = UnitHealth('player')
     local hp_deficit = hp_max - hp_current
@@ -151,11 +232,14 @@ function UseSurvival()
         return
     end
 
-    -- 1. CRITICAL HP (< 35%) - USE CLASS ABILITIES
-    if hp_current <= (hp_max * 0.35) then
-        if CastClassDefensive() then
-            ScriptExtender_Log("Survival: Cast Class Defensive!")
-        end
+    -- 1. CLASS ABILITIES / DEFENSIVES (Check Logic)
+    -- We pass hp_pct to let class logic decide (e.g. Tank LoH < 15%, Mage IceBlock < 20%)
+    local hp_pct = hp_current / hp_max
+    if CastClassDefensive(mobsOnMe, hp_pct) then
+        ScriptExtender_Log("Survival: Cast Class Defensive!")
+        -- If we used a defensive, do we stop? Or do we also pop a potion?
+        -- Usually if we popped a panic button like Ice Block or Bubble, we are safe.
+        return
     end
 
     -- 2. CONSUMABLES

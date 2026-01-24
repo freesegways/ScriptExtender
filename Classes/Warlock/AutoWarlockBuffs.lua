@@ -62,14 +62,15 @@ function AutoWarlockBuffs(m)
     }
 
     local function FindItemInBag(itemName)
-        -- ScriptExtender_Print("DEBUG: Searching bags for '" .. itemName .. "'")
         for b = 0, 4 do
             for s = 1, GetContainerNumSlots(b) do
                 local link = GetContainerItemLink(b, s)
                 if link then
-                    -- local name = GetItemInfo(link) -- sometimes link is enough
-                    -- Case insensitive check on the full link text
-                    if string.find(string.lower(link), string.lower(itemName)) then
+                    -- Extract name from link to ensure exact match
+                    -- Link format: |cQqRrGgBb|Hitem:ID:Enchant:Gem:Gem:suffix|h[Name]|h|r
+                    local _, _, name = string.find(link, "%[(.*)%]")
+
+                    if name and string.lower(name) == string.lower(itemName) then
                         return b, s
                     end
                 end
@@ -145,46 +146,94 @@ function AutoWarlockBuffs(m)
                 end
             end
         elseif buffDef.type == "item_hold" then
-            -- Handle Items we just want to POSSESS (Healthstone)
-            -- We want to try and hold one of EACH rank if possible (user requested "create all healthstones")
+            -- Handle Healthstones (Best Rank Strategy)
+            -- We iterate Top-Down. We rely on Level Check + IsSpellLearned to pick the best valid one.
+            local HS_TYPES = {
+                { spell = "Create Healthstone (Major)",   item = "Major Healthstone",   minLevel = 58 },
+                { spell = "Create Healthstone (Greater)", item = "Greater Healthstone", minLevel = 46 },
+                { spell = "Create Healthstone",           item = "Healthstone",         minLevel = 22 },
+                { spell = "Create Healthstone (Lesser)",  item = "Lesser Healthstone",  minLevel = 10 },
+                { spell = "Create Healthstone (Minor)",   item = "Minor Healthstone",   minLevel = 1 }
+            }
 
-            for _, friendlyName in ipairs(buffDef.createSpells) do
-                -- Use the Rank name for searching the spellbook
-                local searchName = friendlyName
+            local pl = UnitLevel("player")
 
-                -- Check if we know this spell by trying to find it in the book
-                -- FindSpells returns a table of matches: {{name="...", index=123}, ...}
-                local results = FindSpells(searchName)
+            -- 1. Handle Spellstones (Offhand / Use)
+            local SS_TYPES = {
+                { spell = "Create Spellstone (Major)",   item = "Major Spellstone",   minLevel = 60 },
+                { spell = "Create Spellstone (Greater)", item = "Greater Spellstone", minLevel = 48 },
+                { spell = "Create Spellstone",           item = "Spellstone",         minLevel = 36 }
+            }
 
-                if results and results[1] then
-                    -- We know this spell!
-                    local spellIndex = results[1].index
-
-                    local itemName = buffDef.map[friendlyName]
-                    local b, s = FindItemInBag(itemName)
-
-                    if not b then
-                        -- We don't have this specific Healthstone rank. Check resources and craft it.
-                        -- Check Shard
-                        local rb, rs = FindItemInBag("Soul Shard")
-                        if rb and rs then
-                            -- Check Mana (Estimating cost or just trying)
-                            if UnitMana("player") > 200 then
-                                ScriptExtender_Print("AutoBuff: Attempting to create " .. itemName)
-
-                                -- Cast using the index we found
-                                CastSpell(spellIndex, "spell")
-                                return -- Stop after one action
+            for _, t in ipairs(SS_TYPES) do
+                ScriptExtender_Log("Checking SS: " .. t.item)
+                if pl >= t.minLevel then
+                    local spellID = ScriptExtender_GetSpellID(t.spell)
+                    if spellID then
+                        ScriptExtender_Log("Found SpellID: " .. spellID .. " for " .. t.spell)
+                        local b, s = FindItemInBag(t.item)
+                        if not b then
+                            ScriptExtender_Log("Missing " .. t.item .. ". Checking Reagents...")
+                            local rb, rs = FindItemInBag("Soul Shard")
+                            if rb then
+                                if UnitMana("player") > 600 then -- Approx mana cost for high ranks
+                                    ScriptExtender_Print("AutoBuff: Creating " .. t.item)
+                                    CastSpell(spellID, "spell")
+                                    return -- Action taken
+                                end
                             else
-                                -- OOM, wait for next tick
+                                ScriptExtender_Log("AutoBuff: Cannot create " .. t.item .. " - No Soul Shard.")
+                                -- Continue to check lower ranks? Usually only want the best one.
+                                -- If we have no shard, we can't craft ANY rank.
+                                return
                             end
                         else
-                            -- No Shard, can't make it.
-                            -- If we have no shards, we can't make *any* HS, so we should probably stop.
-                            return
+                            ScriptExtender_Log("Found " .. t.item .. " in Bag " .. b .. " Slot " .. s)
+                            -- If we have the best one, stop.
+                            break
+                        end
+                    end
+                end
+            end
+
+            -- 2. Handle Healthstones (Best Rank Strategy)
+            -- We iterate Top-Down. We rely on Level Check + IsSpellLearned to pick the best valid one.
+            for _, t in ipairs(HS_TYPES) do
+                -- Debug Log
+                ScriptExtender_Log("Checking HS: " .. t.item)
+
+                if pl >= t.minLevel then
+                    local spellID = ScriptExtender_GetSpellID(t.spell)
+
+                    if spellID then
+                        ScriptExtender_Log("Found SpellID: " .. spellID .. " for " .. t.spell)
+                        local b, s = FindItemInBag(t.item)
+
+                        if not b then
+                            -- Missing this rank. Create it.
+                            ScriptExtender_Log("Missing " .. t.item .. ". Checking Reagents...")
+
+                            local rb, rs = FindItemInBag("Soul Shard")
+                            if rb then
+                                if UnitMana("player") > 200 then
+                                    ScriptExtender_Print("AutoBuff: Creating " .. t.item)
+                                    -- Cast by ID as requested
+                                    CastSpell(spellID, "spell")
+                                    return -- Action taken, wait for next tick
+                                end
+                            else
+                                ScriptExtender_Log("AutoBuff: Cannot create " .. t.item .. " - No Soul Shard.")
+                                return -- No Shard, cannot craft any
+                            end
+                        else
+                            -- Item exists, continue to next rank
+                            ScriptExtender_Log("Found " .. t.item .. " in Bag " .. b .. " Slot " .. s)
                         end
                     else
-                        -- We have this rank. Continue loop to check for other ranks (stacking unique HS)
+                        -- Only print if we expected to have it (Level Check passed)
+                        if pl >= t.minLevel then
+                            ScriptExtender_Log("Spell not learned/found: " .. t.spell)
+                        end
                     end
                 end
             end

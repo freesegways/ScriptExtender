@@ -1,5 +1,7 @@
 -- Tests for Survival Logic
 -- Tests: Class Defensives, Healthstone Priority, Efficient Potion Usage, Cooldown Handling
+BOOKTYPE_PET = "pet"
+BOOKTYPE_SPELL = "spell"
 
 -- 1. PRIEST PANIC (Shield)
 ScriptExtender_Tests["UseSurvival_Panic_Priest"] = function(t)
@@ -95,4 +97,156 @@ ScriptExtender_Tests["UseSurvival_Skip_Cooldown"] = function(t)
 
     UseSurvival()
     t.AssertEqual(usedSlot, 2, "Should skip Slot 1 (CD) and use Slot 2.")
+end
+
+-- 6. WARLOCK PANIC (Spellstone)
+ScriptExtender_Tests["UseSurvival_Panic_Warlock_Spellstone"] = function(t)
+    local usedSlot = nil
+    t.Mock("UnitHealthMax", function() return 2000 end)
+    t.Mock("UnitHealth", function() return 200 end) -- 10%
+    t.Mock("UnitClass", function() return "WARLOCK", "WARLOCK" end)
+
+    t.Mock("UnitExists", function(u) return false end) -- No pet
+    t.Mock("UnitIsDead", function(u) return false end) -- Safety
+
+    -- Mock Slot 17 (Spellstone)
+    t.Mock("GetInventoryItemLink", function(p, slot)
+        if slot == 17 then return "item:123:Major Spellstone" end
+        return nil
+    end)
+    t.Mock("GetInventoryItemCooldown", function(p, slot) return 0, 0, 1 end) -- Ready
+    t.Mock("UseInventoryItem", function(slot) usedSlot = slot end)
+
+    UseSurvival()
+    t.AssertEqual(usedSlot, 17, "Warlock should use Spellstone (Slot 17).")
+end
+
+-- 7. WARLOCK PANIC (Death Coil)
+ScriptExtender_Tests["UseSurvival_Panic_Warlock_DeathCoil"] = function(t)
+    local spellCast = nil
+    t.Mock("UnitHealthMax", function() return 2000 end)
+    t.Mock("UnitHealth", function() return 200 end)
+    t.Mock("UnitClass", function() return "WARLOCK", "WARLOCK" end)
+
+    t.Mock("UnitExists", function(u)
+        if u == "target" then return true end
+        return false
+    end)
+    t.Mock("UnitCanAttack", function(p, u) return true end)
+    t.Mock("UnitIsDead", function() return false end)             -- Safety
+
+    t.Mock("GetInventoryItemLink", function(p, s) return nil end) -- No Spellstone
+
+    t.Mock("CastSpellByName", function(s) spellCast = s end)
+
+    -- Mock Spellbook for IsSpellReady
+    t.Mock("GetSpellName", function(i)
+        if i == 1 then return "Death Coil" end
+    end)
+    t.Mock("GetSpellCooldown", function(i) return 0, 0 end)
+
+    UseSurvival()
+    t.AssertEqual(spellCast, "Death Coil", "Warlock should cast Death Coil if no Spellstone.")
+end
+
+-- 8. PALADIN TANK PANIC (No Bubble)
+ScriptExtender_Tests["UseSurvival_Panic_Paladin_Tank"] = function(t)
+    local spellCast = nil
+    t.Mock("UnitHealthMax", function() return 2000 end)
+    t.Mock("UnitHealth", function() return 200 end) -- 10%
+    t.Mock("UnitClass", function() return "PALADIN", "PALADIN" end)
+
+    t.Mock("UnitBuff", function(u, i)
+        if i == 1 then return "Interface\\Icons\\Spell_Holy_SealOfFury" end
+        return nil
+    end)
+    t.Mock("UnitDebuff", function() return nil end)
+
+    t.Mock("CastSpellByName", function(s) spellCast = s end)
+
+    -- Mock Spells: Bubble Ready, LoH Ready
+    t.Mock("GetSpellName", function(i)
+        if i == 1 then return "Divine Shield" end
+        if i == 2 then return "Lay on Hands" end
+    end)
+    t.Mock("GetSpellCooldown", function(i) return 0, 0 end)
+
+    UseSurvival()
+    t.AssertEqual(spellCast, "Lay on Hands", "Paladin Tank should SKIP bubble and cast Lay on Hands.")
+end
+
+-- 9. PALADIN NORMAL PANIC (Bubble)
+ScriptExtender_Tests["UseSurvival_Panic_Paladin_Normal"] = function(t)
+    local spellCast = nil
+    t.Mock("UnitHealthMax", function() return 2000 end)
+    t.Mock("UnitHealth", function() return 200 end)
+    t.Mock("UnitClass", function() return "PALADIN", "PALADIN" end)
+
+    t.Mock("UnitBuff", function() return nil end) -- No Tank Buff
+    t.Mock("UnitDebuff", function() return nil end)
+
+    t.Mock("CastSpellByName", function(s) spellCast = s end)
+
+    t.Mock("GetSpellName", function(i)
+        if i == 1 then return "Divine Shield" end
+        if i == 2 then return "Lay on Hands" end
+    end)
+    t.Mock("GetSpellCooldown", function(i) return 0, 0 end)
+
+    UseSurvival()
+    t.AssertEqual(spellCast, "Divine Shield", "Paladin Normal should cast Bubble.")
+end
+
+-- 10. WARLOCK SACRIFICE (Panic < 20%)
+ScriptExtender_Tests["UseSurvival_Panic_Warlock_Sacrifice"] = function(t)
+    local spellCast = nil
+    t.Mock("UnitHealthMax", function() return 2000 end)
+    t.Mock("UnitHealth", function() return 300 end) -- 15%
+    t.Mock("UnitClass", function() return "WARLOCK", "WARLOCK" end)
+
+    t.Mock("UnitExists", function(u)
+        if u == "pet" then return true end
+        return false
+    end)
+    t.Mock("UnitIsDead", function(u) return false end)
+
+    t.Mock("CastSpellByName", function(s) spellCast = s end)
+
+    -- Mock Pet Spellbook
+    t.Mock("GetSpellName", function(i, book)
+        if book == BOOKTYPE_PET and i == 1 then return "Sacrifice" end
+    end)
+    t.Mock("GetSpellCooldown", function(i, book) return 0, 0 end)
+
+    UseSurvival()
+    t.AssertEqual(spellCast, "Sacrifice", "Warlock should cast Sacrifice at low HP.")
+end
+
+-- 11. WARLOCK SACRIFICE (Mob Count >= 3)
+ScriptExtender_Tests["UseSurvival_Panic_Warlock_Sacrifice_Mobs"] = function(t)
+    local spellCast = nil
+    t.Mock("UnitHealthMax", function() return 2000 end)
+    t.Mock("UnitHealth", function() return 600 end) -- 30% (Not Panic Threshold < 20, but < 35 Critical)
+    t.Mock("UnitClass", function() return "WARLOCK", "WARLOCK" end)
+
+    t.Mock("UnitExists", function(u)
+        if u == "pet" then return true end
+        return false
+    end)
+    t.Mock("UnitIsDead", function(u) return false end)
+    t.Mock("CastSpellByName", function(s) spellCast = s end)
+    t.Mock("GetSpellName", function(i, book)
+        if book == BOOKTYPE_PET and i == 1 then return "Sacrifice" end
+    end)
+    t.Mock("GetSpellCooldown", function(i, book) return 0, 0 end)
+
+    -- Mock Mob Distribution
+    GetMobDistribution = function()
+        return 5, { ["player"] = 4 } -- 4 mobs on player
+    end
+
+    UseSurvival()
+    t.AssertEqual(spellCast, "Sacrifice", "Warlock should cast Sacrifice if 3+ mobs on me.")
+
+    GetMobDistribution = nil -- Cleanup
 end

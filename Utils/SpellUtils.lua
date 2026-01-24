@@ -79,16 +79,29 @@ local BOOKTYPE_SPELL = "spell"
 local SpellIDCache = {}
 
 function ScriptExtender_GetSpellID(spellName)
-    -- Required: GetSpellCooldown API needs numeric ID, not name.
-
     -- Check Cache
     local cached = SpellIDCache[spellName]
     if cached then
-        local name = GetSpellName(cached, BOOKTYPE_SPELL)
-        -- Verify base name matches to ensure slot hasn't shifted wildly
-        if name and string.find(spellName, name, 1, true) == 1 then
+        -- Verify validity (Spellbook shifts during training)
+        local n, _ = GetSpellName(cached, BOOKTYPE_SPELL)
+        if n and string.find(spellName, n, 1, true) then
             return cached
         end
+        -- Cache invalid, clear it
+        SpellIDCache[spellName] = nil
+    end
+
+    -- Normalization: Handle "Spell Name(Rank X)" vs "Spell Name (Rank X)"
+    local targetBase = spellName
+    local targetRank = nil
+
+    local s, e, r = string.find(spellName, "Rank (%d+)")
+    if s then
+        targetRank = "Rank " .. r
+        targetBase = string.sub(spellName, 1, s - 2) -- remove " (Rank X"
+        -- Handle space/no-space
+        if string.sub(targetBase, -1) == "(" then targetBase = string.sub(targetBase, 1, -2) end
+        targetBase = string.gsub(targetBase, "%s+$", "") -- trim tail
     end
 
     local i = 1
@@ -96,20 +109,24 @@ function ScriptExtender_GetSpellID(spellName)
         local name, rank = GetSpellName(i, BOOKTYPE_SPELL)
         if not name then break end
 
-        if name == spellName then
-            SpellIDCache[spellName] = i
-            return i
-        end
+        if name == targetBase or name == spellName then
+            -- Found Base Name match
+            if targetRank then
+                -- Precise Rank Requested
+                if rank == targetRank then
+                    SpellIDCache[spellName] = i
+                    return i
+                end
+            else
+                -- No Rank Requested (Base Name Only)
+                -- We found a rank of it.
+                -- If we want "Best Rank", we should keep looping?
+                -- Usually, GetSpellID is used for Cooldowns (Shared) or presence check.
+                -- Returning the current index is fine.
+                -- However, usually we want the Max Rank for 'CastSpell' usage if we used ID.
+                -- But we use CastSpellByName.
 
-        if rank then
-            local fullName = name .. " (" .. rank .. ")"
-            if fullName == spellName then
-                SpellIDCache[spellName] = i
-                return i
-            end
-            -- Support "Name(Rank)" format (No Space)
-            local fullNameNoSpace = name .. "(" .. rank .. ")"
-            if fullNameNoSpace == spellName then
+                -- We return this ID.
                 SpellIDCache[spellName] = i
                 return i
             end
@@ -125,11 +142,29 @@ end
 -- @return boolean true if ready, false otherwise.
 function ScriptExtender_IsSpellReady(spellName)
     local id = ScriptExtender_GetSpellID(spellName)
-    if not id then return true end -- Fail open if spell not found
+
+    -- If we can't find the spell ID, we assume it's NOT ready/valid to avoid spamming failed errors?
+    -- User reports "complaining a lot about ability not being ready".
+    -- This means IsSpellReady returns FALSE often.
+    -- If id is NIL, we returned TRUE previously.
+    -- If we return TRUE, script tries to cast -> fails -> WoW Error "Ability not ready yet".
+
+    -- WAIT. User said "complaining ... about ability not being ready".
+    -- Checks:
+    -- 1. IsSpellReady returns false? Script skips. Silence.
+    -- 2. IsSpellReady returns TRUE? Script casts. Game says "Ability not ready".
+    -- Conclusion: IsSpellReady returns TRUE incorrectly!
+    -- Why? Maybe ID not found -> Returns True.
+    -- Fix: If ID not found, return FALSE. We cannot cast what we don't have.
+
+    if not id then return false end
 
     local start, duration = GetSpellCooldown(id, BOOKTYPE_SPELL)
     if start > 0 and duration > 0 then
         local rem = duration - (GetTime() - start)
+        -- GCD is usually 1.5s. If rem > 1.5, it's real CD.
+        -- If we want to queue, we permit small REM?
+        -- If rem > 0.1, we consider it not ready.
         if rem > 0.1 then
             return false
         end
@@ -142,6 +177,5 @@ end
 -- @return boolean true if learned.
 function ScriptExtender_IsSpellLearned(spellName)
     local id = ScriptExtender_GetSpellID(spellName)
-    if id then return true end
-    return false
+    return (id ~= nil)
 end

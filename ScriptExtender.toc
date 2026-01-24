@@ -70,6 +70,7 @@ Classes\Mage\AutoMageBuffs.lua
 Classes\Warlock\DeleteExcessShards.lua
 Classes\Warlock\DeleteExcessShards.test.lua
 Classes\Warlock\AutoWarlockBuffs.lua
+Classes\Warlock\AutoWarlockBuffs.test.lua
 
 Classes\Druid\AutoDruidBuffs.lua
 
@@ -87,3 +88,4 @@ Classes\Warlock\AutoWarlock.test.lua
 Classes\Warlock\WarlockAnalyze.test.lua
 Classes\Warlock\WarlockAnalyze_Group.test.lua
 Classes\Warlock\WarlockAnalyze_Marks.test.lua
+UI\MacroWindow.xml

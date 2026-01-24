@@ -160,13 +160,18 @@ for line in fh:lines() do
         -- Handle Windows Paths
         local path = line:gsub("\\", "/")
 
-        -- Try to load
-        local chunk, err = loadfile(path)
-        if chunk then
-            chunk()
+        -- Skip XML files
+        if string.find(line, "%.xml$") then
+            -- print("Skipping XML: " .. line)
         else
-            print("Error loading " .. path .. ": " .. err)
-            os.exit(1)
+            -- Try to load
+            local chunk, err = loadfile(path)
+            if chunk then
+                chunk()
+            else
+                print("Error loading " .. path .. ": " .. err)
+                os.exit(1)
+            end
         end
     end
 end

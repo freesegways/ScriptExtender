@@ -1,0 +1,118 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+    <Script file="MacroWindow.lua"/>
+
+    <Frame name="SE_MacroEntryTemplate" virtual="true">
+        <Size><AbsDimension x="300" y="40"/></Size>
+        <Layers>
+            <Layer level="ARTWORK">
+                <FontString name="$parentName" inherits="GameFontHighlight" justifyH="LEFT" text="Macro Name">
+                    <Size><AbsDimension x="200" y="14"/></Size>
+                    <Anchors><Anchor point="TOPLEFT"><Offset><AbsDimension x="5" y="-5"/></Offset></Anchor></Anchors>
+                </FontString>
+                <FontString name="$parentDesc" inherits="GameFontNormalSmall" justifyH="LEFT" text="Description goes here...">
+                    <Size><AbsDimension x="240" y="24"/></Size>
+                    <Anchors><Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT"><Offset><AbsDimension x="0" y="-2"/></Offset></Anchor></Anchors>
+                    <Color r="0.7" g="0.7" b="0.7"/>
+                </FontString>
+            </Layer>
+        </Layers>
+        <Frames>
+            <Button name="$parentRun" inherits="UIPanelButtonTemplate" text="Run">
+                <Size><AbsDimension x="50" y="22"/></Size>
+                <Anchors><Anchor point="RIGHT"><Offset><AbsDimension x="-5" y="0"/></Offset></Anchor></Anchors>
+                <Scripts>
+                    <OnClick>SE_MacroEntry_Run(this:GetParent());</OnClick>
+                </Scripts>
+            </Button>
+        </Frames>
+    </Frame>
+
+    <Frame name="SE_CategoryHeaderTemplate" virtual="true">
+        <Size><AbsDimension x="310" y="20"/></Size>
+        <Layers>
+            <Layer level="BACKGROUND">
+               <Texture name="$parentBg">
+                    <Color r="1" g="1" b="1" a="0.1"/>
+               </Texture>
+            </Layer>
+            <Layer level="ARTWORK">
+                <FontString name="$parentText" inherits="GameFontNormal" justifyH="LEFT">
+                    <Anchors><Anchor point="LEFT"><Offset><AbsDimension x="5" y="0"/></Offset></Anchor></Anchors>
+                    <Color r="1.0" g="0.82" b="0.0"/>
+                </FontString>
+            </Layer>
+        </Layers>
+    </Frame>
+
+    <Frame name="ScriptExtenderFrame" toplevel="true" enableMouse="true" movable="true" parent="UIParent" hidden="true">
+        <Size><AbsDimension x="350" y="500"/></Size>
+        <Anchors><Anchor point="CENTER"/></Anchors>
+        <Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+            <BackgroundInsets><AbsInset left="11" right="12" top="12" bottom="11"/></BackgroundInsets>
+            <TileSize><AbsValue val="32"/></TileSize>
+            <EdgeSize><AbsValue val="32"/></EdgeSize>
+        </Backdrop>
+        <Layers>
+            <Layer level="ARTWORK">
+                <Texture name="$parentTitleHeader" file="Interface\DialogFrame\UI-DialogBox-Header">
+                    <Size><AbsDimension x="256" y="64"/></Size>
+                    <Anchors><Anchor point="TOP"><Offset><AbsDimension x="0" y="12"/></Offset></Anchor></Anchors>
+                </Texture>
+                <FontString name="$parentTitleText" inherits="GameFontNormal" text="Script Extender">
+                    <Anchors><Anchor point="TOP"><Offset><AbsDimension x="0" y="-2"/></Offset></Anchor></Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
+        <Frames>
+            <Button name="$parentCloseButton" inherits="UIPanelCloseButton">
+                <Anchors><Anchor point="TOPRIGHT"><Offset><AbsDimension x="-5" y="-5"/></Offset></Anchor></Anchors>
+            </Button>
+            
+            <CheckButton name="SE_DebugCheck" inherits="OptionsCheckButtonTemplate">
+                <Anchors><Anchor point="TOPLEFT"><Offset><AbsDimension x="20" y="-30"/></Offset></Anchor></Anchors>
+                <Scripts>
+                    <OnLoad>getglobal(this:GetName().."Text"):SetText("Enable Debug Logs");</OnLoad>
+                    <OnClick>SE_ToggleDebug(this:GetChecked())</OnClick>
+                </Scripts>
+            </CheckButton>
+
+            <ScrollFrame name="SE_ScrollFrame" inherits="UIPanelScrollFrameTemplate">
+                <Size><AbsDimension x="305" y="380"/></Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT"><Offset><AbsDimension x="15" y="-70"/></Offset></Anchor>
+                </Anchors>
+                <ScrollChild>
+                    <Frame name="SE_ScrollChild">
+                        <Size><AbsDimension x="305" y="380"/></Size>
+                    </Frame>
+                </ScrollChild>
+            </ScrollFrame>
+        </Frames>
+        <Scripts>
+            <OnLoad>SE_OnLoad();</OnLoad>
+            <OnShow>SE_OnShow();</OnShow>
+        </Scripts>
+    </Frame>
+    <Button name="SE_MinimapButton" parent="Minimap" toplevel="true" frameStrata="LOW">
+        <Size><AbsDimension x="32" y="32"/></Size>
+        <Anchors><Anchor point="TOPLEFT" relativeTo="Minimap" relativePoint="RIGHT"><Offset><AbsDimension x="5" y="0"/></Offset></Anchor></Anchors>
+        <Scripts>
+            <OnLoad>SE_MinimapButton_OnLoad();</OnLoad>
+        </Scripts>
+        <HighlightTexture alphaMode="ADD" file="Interface\Minimap\UI-Minimap-ZoomButton-Highlight"/>
+        <Layers>
+            <Layer level="BACKGROUND">
+                <Texture name="$parentIcon" file="Interface\Icons\Trade_Engineering">
+                    <Size><AbsDimension x="20" y="20"/></Size>
+                    <Anchors><Anchor point="CENTER"><Offset><AbsDimension x="-1" y="1"/></Offset></Anchor></Anchors>
+                </Texture>
+            </Layer>
+            <Layer level="OVERLAY">
+                <Texture file="Interface\Minimap\MiniMap-TrackingBorder">
+                    <Size><AbsDimension x="52" y="52"/></Size>
+                    <Anchors><Anchor point="TOPLEFT"><Offset><AbsDimension x="-10" y="-10"/></Offset></Anchor></Anchors>
+                </Texture>
+            </Layer>
+        </Layers>
+    </Button>
+</Ui>

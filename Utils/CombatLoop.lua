@@ -47,9 +47,9 @@ function ScriptExtender_RunCombatLoop(actors)
             local u = "target"
             local n = UnitName(u)
 
-            -- Safety: If player is in combat, ignore OOC targets completely (unless it's the manual target we just checked)
-            local valid = true
-            if inCombat and not UnitAffectingCombat(u) then valid = false end
+            -- Safety: Auto-Scan targets MUST be in combat. Never auto-pull OOC mobs.
+            -- If we want to pull an OOC mob, we do it via Manual Target (Phase 1 aka manualOverride).
+            local valid = UnitAffectingCombat(u)
 
             if valid then
                 for idx, actor in ipairs(actors) do
@@ -127,9 +127,19 @@ function ScriptExtender_RunCombatLoop(actors)
     end
 
     -- Cleanup
+    -- If we engaged no action, and we were in Auto-Scan mode (no manual override),
+    -- we might be left targeting a random OOC mob from the scan loop. Clear it.
+    if not anyActionExecuted and not manualOverride then
+        if UnitExists("target") and not UnitIsDead("target") then
+            -- Check if this accidental target is combat-valid?
+            -- If it's OOC, we definitely want to drop it to be safe.
+            if not UnitAffectingCombat("target") then
+                ClearTarget()
+            end
+        end
+    end
+
     if not UnitExists("target") or UnitIsDead("target") then
-        ClearTarget()
-    elseif actors.untargetIfNoActionExecuted and not anyActionExecuted then
         ClearTarget()
     end
 end
