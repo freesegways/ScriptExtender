@@ -21,6 +21,7 @@ Utils\NextSpells.lua
 Utils\NextSpells.test.lua
 Utils\GetTargetPriority.lua
 Utils\TargetSafety.lua
+Utils\TargetValidation.lua
 Utils\CombatLoop.lua
 Utils\TalentUtils.lua
 Utils\TalentUtils.test.lua

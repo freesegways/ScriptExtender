@@ -347,7 +347,13 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
                     local elapsed = tm - last
                     local myDotActive = false
 
-                    if last > 0 and elapsed < duration then myDotActive = true end
+                    if last > 0 and elapsed < duration then
+                        myDotActive = true
+                        -- Name Collision Fix: Verify debuff actually exists if cast > 1s ago
+                        if elapsed > 1 and not ScriptExtender_HasDebuff(u, trackTex) then
+                            myDotActive = false
+                        end
+                    end
 
                     -- Determine if we should cast
                     local shouldCast = false

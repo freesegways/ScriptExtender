@@ -65,7 +65,15 @@ function ScriptExtender_RunCombatLoop(actors)
                         end
 
                         if score > best[idx].score then
-                            best[idx] = { score = score, action = action, type = type, targetName = n, strict = true }
+                            best[idx] = {
+                                score = score,
+                                action = action,
+                                type = type,
+                                targetName = n,
+                                targetLevel = UnitLevel(u),
+                                targetMaxHP = UnitHealthMax(u),
+                                strict = true
+                            }
                         end
                     end
                 end
@@ -92,9 +100,8 @@ function ScriptExtender_RunCombatLoop(actors)
                 return false
             end
 
-            -- Re-target if necessary or verify current
             local needScan = false
-            if UnitName("target") ~= b.targetName then
+            if not ScriptExtender_IsTargetMatch(b, "target") then
                 needScan = true
             else
                 if not VerifyTarget() then needScan = true end
@@ -105,7 +112,7 @@ function ScriptExtender_RunCombatLoop(actors)
                 if not actors.disableScan then
                     for i = 1, 25 do
                         TargetNearestEnemy()
-                        if UnitName("target") == b.targetName then
+                        if ScriptExtender_IsTargetMatch(b, "target") then
                             if VerifyTarget() then
                                 found = true; break
                             end
@@ -116,7 +123,7 @@ function ScriptExtender_RunCombatLoop(actors)
             end
 
             -- Final Check
-            if UnitName("target") == b.targetName then
+            if ScriptExtender_IsTargetMatch(b, "target") then
                 -- Final verification safety wrapper
                 if not b.strict or UnitAffectingCombat("target") then
                     actor.onExecute(b.action, b.targetName, tm)
