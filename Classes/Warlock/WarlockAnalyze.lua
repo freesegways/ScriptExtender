@@ -119,7 +119,9 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
     if GetNumPartyMembers() > 0 and pHp > 40 then safeToDrain = false end
 
     if pHp < 50 and safeToDrain and not isDrainImmune then
-        return "Drain Life", "kill", (prio >= 2 and 95 or 35)
+        local score = (prio >= 2 and 95 or 35)
+        if prio >= 4 then score = score + 20 end
+        return "Drain Life", "kill", score
     end
 
     -- EXECUTE LOGIC
@@ -144,18 +146,24 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
 
             if sbReady and shards > 0 and (not WD_Track["SB"] or (tm - WD_Track["SB"]) > 15) then
                 WD_Track["SB"] = tm
-                return "Shadowburn", "kill", (prio >= 2 and 140 or 100)
+                local score = (prio >= 2 and 140 or 100)
+                if prio >= 4 then score = score + 20 end
+                return "Shadowburn", "kill", score
             end
         end
         -- Drain Soul
         local inSoulRange = (isPercentMode and hpPercent <= 20) or (hpVal <= soulThreshold)
         if inSoulRange then
-            return "Drain Soul", "kill", (prio >= 2 and 130 or 90)
+            local score = (prio >= 2 and 130 or 90)
+            if prio >= 4 then score = score + 20 end
+            return "Drain Soul", "kill", score
         end
     end
 
     if pMana < 35 and UnitPowerType(u) == 0 and UnitMana(u) > 0 then
-        return "Drain Mana", "kill", (prio >= 2 and 85 or 25)
+        local score = (prio >= 2 and 85 or 25)
+        if prio >= 4 then score = score + 20 end
+        return "Drain Mana", "kill", score
     end
 
     -- 2. DOTS & CURSES
@@ -438,7 +446,10 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
         filler = "Shoot"
     end
 
-    return filler, "fill", (prio >= 2 and 60 or 10)
+    local baseScore = (prio >= 2 and 60 or 10)
+    if prio >= 4 then baseScore = baseScore + 20 end -- Boost for Skull/High Prio
+
+    return filler, "fill", baseScore
 end
 
 function ScriptExtender_Warlock_UpdateTracker(s, n, tm)

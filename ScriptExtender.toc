@@ -53,6 +53,7 @@ Combat\UseSurvival.lua
 Combat\UseSurvival.test.lua
 Combat\SwapWeapons.lua
 Combat\SwapWeapons.test.lua
+Combat\ManaWand.lua
 
 Healing\SmartCancel.lua
 Healing\SmartCancel.test.lua

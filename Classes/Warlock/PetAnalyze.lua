@@ -1,6 +1,25 @@
 -- Classes/Warlock/PetAnalyze.lua
 -- Analysis logic for Warlock pet automation.
 
+local function IsPetSpellReady(spellName)
+    local i = 1
+    while true do
+        local name, _ = GetSpellName(i, "pet")
+        if not name then break end
+        if name == spellName then
+            local start, duration = GetSpellCooldown(i, "pet")
+            if start > 0 and duration > 0 then
+                local rem = duration - (GetTime() - start)
+                if rem > 0.1 then return false end
+            end
+            return true
+        end
+        i = i + 1
+    end
+    -- If not found (pet not summoned or spell not known), cannot cast
+    return false
+end
+
 function ScriptExtender_Warlock_PetAnalyze(u, forceOOC, tm)
     local P = "player"
     if not UnitExists(u) or UnitIsDead(u) or UnitIsFriend(P, u) then return nil, nil, -999 end
@@ -61,17 +80,31 @@ function ScriptExtender_Warlock_PetSpells(action, targetName, tm)
     local pet_mana = UnitMana("pet")
 
     if family == "Imp" then
-        if pet_mana > 20 and (pet_hp / pet_max < 0.2) then CastSpellByName("Phase Shift") end
-        if pet_mana > 60 then CastSpellByName("Firebolt") end
+        if pet_mana > 20 and (pet_hp / pet_max < 0.2) and IsPetSpellReady("Phase Shift") then
+            CastSpellByName("Phase Shift")
+        end
+        if pet_mana > 60 and IsPetSpellReady("Firebolt") then
+            CastSpellByName("Firebolt")
+        end
     elseif family == "Voidwalker" then
         local pl_hp = UnitHealth("player")
         local pl_max = UnitHealthMax("player")
-        if pl_hp / pl_max < 0.2 then CastSpellByName("Sacrifice") end
-        if pet_mana > 60 then CastSpellByName("Torment") end
-        if pet_mana > 150 and UnitAffectingCombat(P) then CastSpellByName("Suffering") end
+        if pl_hp / pl_max < 0.2 and IsPetSpellReady("Sacrifice") then
+            CastSpellByName("Sacrifice")
+        end
+        if pet_mana > 60 and IsPetSpellReady("Torment") then
+            CastSpellByName("Torment")
+        end
+        if pet_mana > 150 and UnitAffectingCombat(P) and IsPetSpellReady("Suffering") then
+            CastSpellByName("Suffering")
+        end
     elseif family == "Succubus" then
-        if pet_mana > 60 then CastSpellByName("Lash of Pain") end
+        if pet_mana > 60 and IsPetSpellReady("Lash of Pain") then
+            CastSpellByName("Lash of Pain")
+        end
     elseif family == "Felhunter" then
-        if pet_mana > 50 then CastSpellByName("Spell Lock") end
+        if pet_mana > 50 and IsPetSpellReady("Spell Lock") then
+            CastSpellByName("Spell Lock")
+        end
     end
 end
