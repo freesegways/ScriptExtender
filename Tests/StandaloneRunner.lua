@@ -81,6 +81,10 @@ function ClearTarget() end
 
 function TargetLastTarget() end
 
+function TargetByName(n) end
+
+function UnitCanAttack(u1, u2) return true end
+
 function CastSpellByName(n) end
 
 function SpellStopCasting() end
@@ -132,6 +136,21 @@ function CreateFrame(type, name, parent, template)
     frame.SetOwner = function() end
     frame.ClearLines = function() end
     frame.SetPlayerBuff = function() end
+    frame.SetUnitDebuff = function() end
+    frame.RegisterEvent = function() end
+    frame.SetScript = function() end
+
+
+    if name then
+        _G[name] = frame
+        if type == "GameTooltip" then
+            -- Mock the TextLeft1 region which is commonly accessed
+            local left1 = {}
+            left1.GetText = function() return nil end
+            _G[name .. "TextLeft1"] = left1
+        end
+    end
+
     return frame
 end
 
@@ -177,7 +196,34 @@ for line in fh:lines() do
 end
 
 fh:close()
+-- fh:close() removed (duplicate)
 print("All files loaded.")
+
+-- Load additional test file from command line if provided
+if arg and arg[1] then
+    print("Loading specific test file: " .. arg[1])
+    -- Clear previous tests to run ONLY this one
+    ScriptExtender_Tests = {}
+
+    local chunk, err = loadfile(arg[1])
+    if chunk then
+        chunk()
+    else
+        print("Error loading argument file " .. arg[1] .. ": " .. err)
+        os.exit(1)
+    end
+end
+
+-- Re-Apply Overrides (Files might have overwritten them)
+function ScriptExtender_Print(msg)
+    msg = string.gsub(msg, "|c%x%x%x%x%x%x%x%x", "")
+    msg = string.gsub(msg, "|r", "")
+    print("[MSG] " .. msg)
+end
+
+function ScriptExtender_Log(msg)
+    -- print("[LOG] " .. msg)
+end
 
 -- =========================================================
 -- 3. RUN TESTS

@@ -28,11 +28,21 @@ function ScriptExtender_Warlock_CountWarlocks()
 end
 
 function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
+    -- PROTECTION: Do not interrupt Channels
+    -- Prevent clipping important channels (Drains, AoE, Dark Harvest)
+    local cName = UnitChannelInfo("player")
+    if cName then
+        if cName == "Drain Life" or cName == "Drain Soul" or cName == "Hellfire" or cName == "Rain of Fire" or cName == "Dark Harvest" then
+            return nil, nil, -1000
+        end
+    end
+
     local pl = "player"
     if not UnitExists(u) or UnitIsDead(u) or UnitIsFriend(pl, u) then return nil, nil, -1000 end
 
     -- OOC Safety: Only process if target is in combat OR we are forcing OOC (Manual Start)
-    if not forceOOC and not UnitAffectingCombat(u) then
+    -- Also allow if unit is "target" (Manual Pull)
+    if not forceOOC and not UnitAffectingCombat(u) and u ~= "target" then
         return nil, nil, -1000
     end
 
@@ -128,7 +138,27 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
     local execThreshold = isPercentMode and 25 or (sbDmg * 1.5)
     local soulThreshold = isPercentMode and 20 or (boltDmg * 1.5)
 
+    ScriptExtender_Print("DEBUG: Execute Phase Check: HP=" .. hpVal .. " SB=" .. sbDmg .. " MaxHP=" .. hpMax)
     if (isPercentMode and hpPercent < 35) or (not isPercentMode and hpVal < (sbDmg * 3)) then
+        ScriptExtender_Print("DEBUG: Entered Execute Block")
+        -- Dark Harvest (Execute Prio - "End of mobs life")
+        -- 704 dmg over 7.44s. Resets CD on kill.
+        if ScriptExtender_IsSpellReady("Dark Harvest") and ScriptExtender_GetSpellID("Dark Harvest") then
+            ScriptExtender_Print("DEBUG: Dark Harvest Ready & Known")
+            -- Use slightly generous range since it's a channel we want to full-cast
+            local inHarvestRange = (isPercentMode and hpPercent <= 25) or (hpVal <= (sbDmg * 2))
+            if inHarvestRange then
+                local score = (prio >= 2 and 145 or 105) -- Higher than Shadowburn (140) if feasible?
+                -- Actually Shadowburn is instant execute. DH is channel.
+                -- If we can kill with Shadowburn instant, do it.
+                -- DH takes time. But resets CD.
+                -- Let's put DH slightly below Shadowburn but above Drain Soul.
+                score = (prio >= 2 and 135 or 95)
+                if prio >= 4 then score = score + 20 end
+                return "Dark Harvest", "kill", score
+            end
+        end
+
         -- Shadowburn
         local hasShadowburn = ScriptExtender_HasTalent("Shadowburn")
         local inRange = (isPercentMode and hpPercent <= 25) or (hpVal <= execThreshold)
@@ -307,122 +337,134 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, tm)
 
     local isDying = (isPercentMode and hpPercent < 20) or (hpVal < killThreshold)
 
-    if not isDying then
-        local killerDotActive = false
+    -- Removed early return wrapper (if not isDying) to allow Utility Curses on dying mobs.
+    local killerDotActive = false
 
-        -- Process DoTs
-        for x, s in ipairs(DoTs) do
-            local isCurseSlot = (s == "Curse of Agony")
+    -- Process DoTs
+    for x, s in ipairs(DoTs) do
+        local isCurseSlot = (s == "Curse of Agony")
 
-            -- If we explicitly cancelled cursing (conflict), we skip curse slot
-            local skipCast = false
-            if isCurseSlot and not curseToUse then
+        -- If we explicitly cancelled cursing (conflict), we skip curse slot
+        local skipCast = false
+        if isCurseSlot and not curseToUse then
+            skipCast = true
+        end
+
+        if not skipCast then
+            if killerDotActive and not isCurseSlot then break end
+
+            local castName = s
+            local trackTex = Tex[x]
+            local duration = Dur[x]
+
+            -- Dynamic updates for Curse Slot
+            if isCurseSlot then
+                castName = curseToUse
+                trackTex = curseTex
+                duration = curseDur
+            end
+
+            -- Filter: Siphon Life
+            if s == "Siphon Life" then
+                -- Strict: Only if Player Low (<50%) AND (Target High (>50%) or Boss)
+                -- Also respect Drain Immunity
+                local slCondition = (pHp < 50) and (isBoss or hpPercent > 50)
+                if not hasSiphonLife or isDrainImmune or not slCondition then
+                    skipCast = true
+                end
+            end
+
+            -- Filter: Immolate
+            if dpsMultiplier > 1.0 and s == "Immolate" and hpPercent < 40 then
                 skipCast = true
             end
 
             if not skipCast then
-                if killerDotActive and not isCurseSlot then break end
+                local k = n .. trackTex
+                local last = WD_Track[k] or 0
+                local elapsed = tm - last
+                local myDotActive = false
 
-                local castName = s
-                local trackTex = Tex[x]
-                local duration = Dur[x]
-
-                -- Dynamic updates for Curse Slot
-                if isCurseSlot then
-                    castName = curseToUse
-                    trackTex = curseTex
-                    duration = curseDur
-                end
-
-                -- Filter: Siphon Life
-                if s == "Siphon Life" then
-                    -- Strict: Only if Player Low (<50%) AND (Target High (>50%) or Boss)
-                    -- Also respect Drain Immunity
-                    local slCondition = (pHp < 50) and (isBoss or hpPercent > 50)
-                    if not hasSiphonLife or isDrainImmune or not slCondition then
-                        skipCast = true
+                if last > 0 and elapsed < duration then
+                    myDotActive = true
+                    -- Name Collision Fix: Verify debuff actually exists if cast > 1s ago
+                    if elapsed > 1 and not ScriptExtender_HasDebuff(u, trackTex) then
+                        myDotActive = false
                     end
                 end
 
-                -- Filter: Immolate
-                if dpsMultiplier > 1.0 and s == "Immolate" and hpPercent < 40 then
-                    skipCast = true
+                -- Determine if we should cast
+                local shouldCast = false
+
+                if not myDotActive then
+                    shouldCast = true
                 end
 
-                if not skipCast then
-                    local k = n .. trackTex
-                    local last = WD_Track[k] or 0
-                    local elapsed = tm - last
-                    local myDotActive = false
+                -- Refresh Logic (Clip prevention / Early refresh)
+                if myDotActive and elapsed > (duration - 3) and elapsed < (duration + 5) then
+                    shouldCast = true
+                end
 
-                    if last > 0 and elapsed < duration then
-                        myDotActive = true
-                        -- Name Collision Fix: Verify debuff actually exists if cast > 1s ago
-                        if elapsed > 1 and not ScriptExtender_HasDebuff(u, trackTex) then
-                            myDotActive = false
-                        end
-                    end
+                -- Do not cast Long DoTs if target is about to die
+                local isLongDoT = (duration > 10) -- Lowered from 15 to include Immolate(15) in 'Dying' skip
+                local timeToDieShort = (hpVal < killThreshold) or isDying
 
-                    -- Determine if we should cast
-                    local shouldCast = false
+                if isLongDoT and timeToDieShort and not string.find(castName, "Recklessness") then
+                    shouldCast = false
+                end
 
-                    if not myDotActive then
-                        shouldCast = true
-                    end
-
-                    -- Refresh Logic (Clip prevention / Early refresh)
-                    if myDotActive and elapsed > (duration - 3) and elapsed < (duration + 5) then
-                        shouldCast = true
-                    end
-
-                    -- Do not cast Long DoTs if target is about to die
-                    local isLongDoT = (duration > 15)
-                    local timeToDieShort = (hpVal < killThreshold)
-
-                    if isLongDoT and timeToDieShort and not string.find(castName, "Recklessness") then
-                        shouldCast = false
-                    end
+                if shouldCast then
+                    -- Killer Check Logic (Low Level Only)
+                    if killerDotActive and not isCurseSlot then shouldCast = false end
 
                     if shouldCast then
-                        -- Killer Check Logic (Low Level Only)
-                        if killerDotActive and not isCurseSlot then shouldCast = false end
-
-                        if shouldCast then
-                            local wouldKill = false
-                            local thisDotDmg = 0
-                            if isCurseSlot then
-                                thisDotDmg = agonyDmg
-                            elseif s == "Corruption" then
-                                thisDotDmg = corrDmg
-                            elseif s == "Siphon Life" then
-                                thisDotDmg = siphonDmg
-                            end
-
-                            if thisDotDmg > hpVal then wouldKill = true end
-
-                            local baseScore = 30
-                            if prio >= 4 then
-                                baseScore = 105
-                            elseif prio == 3 then
-                                baseScore = 100
-                            elseif prio == 2 then
-                                baseScore = 90
-                            end
-
-                            local decay = x * 5
-                            local score = baseScore - decay
-
-                            if wouldKill and isLowLevel then score = score + 50 end
-                            if s == "Siphon Life" and prio >= 3 then score = score + 10 end
-
-                            -- Priority Boost for DoTs in Groups (Spread Dmg)
-                            if dpsMultiplier > 1.5 then score = score + 5 end
-
-                            return castName, "dot", score
+                        local wouldKill = false
+                        local thisDotDmg = 0
+                        if isCurseSlot then
+                            thisDotDmg = agonyDmg
+                        elseif s == "Corruption" then
+                            thisDotDmg = corrDmg
+                        elseif s == "Siphon Life" then
+                            thisDotDmg = siphonDmg
                         end
+
+                        if thisDotDmg > hpVal then wouldKill = true end
+
+                        local baseScore = 30
+                        if prio >= 4 then
+                            baseScore = 105
+                        elseif prio == 3 then
+                            baseScore = 100
+                        elseif prio == 2 then
+                            baseScore = 90
+                        end
+
+                        local decay = x * 5
+                        local score = baseScore - decay
+
+                        if wouldKill and isLowLevel then score = score + 50 end
+                        if s == "Siphon Life" and prio >= 3 then score = score + 10 end
+
+                        -- Priority Boost for DoTs in Groups (Spread Dmg)
+                        if dpsMultiplier > 1.5 then score = score + 5 end
+
+                        return castName, "dot", score
                     end
                 end
             end
+        end
+    end
+    -- Loop End
+
+    -- 2.5 DARK HARVEST (Mid-Combat / Single Target)
+    -- "if there's only a single mob we're fighting you should use it quite often to get the most out of dots"
+    if ScriptExtender_IsSpellReady("Dark Harvest") and ScriptExtender_GetSpellID("Dark Harvest") and not isDying then
+        -- Condition: Single Target Mode (Solo or Boss) AND healthy target
+        if dpsMultiplier == 1.0 or isBoss then
+            -- Score: Moderate. Above Filler (60/10), Below DoTs (~100/30).
+            -- It essentially acts as a powerful DoT.
+            local score = (prio >= 2 and 80 or 40)
+            return "Dark Harvest", "damage", score
         end
     end
 

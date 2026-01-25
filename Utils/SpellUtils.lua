@@ -76,11 +76,12 @@ end
 local BOOKTYPE_SPELL = "spell"
 
 -- Cache IDs to avoid expensive API loops
-local SpellIDCache = {}
+-- Cache IDs to avoid expensive API loops
+ScriptExtender_SpellUtils.IDCache = {}
 
 function ScriptExtender_GetSpellID(spellName)
     -- Check Cache
-    local cached = SpellIDCache[spellName]
+    local cached = ScriptExtender_SpellUtils.IDCache[spellName]
     if cached then
         -- Verify validity (Spellbook shifts during training)
         local n, _ = GetSpellName(cached, BOOKTYPE_SPELL)
@@ -88,7 +89,7 @@ function ScriptExtender_GetSpellID(spellName)
             return cached
         end
         -- Cache invalid, clear it
-        SpellIDCache[spellName] = nil
+        ScriptExtender_SpellUtils.IDCache[spellName] = nil
     end
 
     -- Normalization: Handle "Spell Name(Rank X)" vs "Spell Name (Rank X)"
@@ -114,7 +115,7 @@ function ScriptExtender_GetSpellID(spellName)
             if targetRank then
                 -- Precise Rank Requested
                 if rank == targetRank then
-                    SpellIDCache[spellName] = i
+                    ScriptExtender_SpellUtils.IDCache[spellName] = i
                     return i
                 end
             else
@@ -127,7 +128,7 @@ function ScriptExtender_GetSpellID(spellName)
                 -- But we use CastSpellByName.
 
                 -- We return this ID.
-                SpellIDCache[spellName] = i
+                ScriptExtender_SpellUtils.IDCache[spellName] = i
                 return i
             end
         end

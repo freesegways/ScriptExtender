@@ -102,3 +102,47 @@ function ScriptExtender_Help()
     end
     DEFAULT_CHAT_FRAME:AddMessage("|cffffd700/se debug|r - Toggles debug logging.")
 end
+
+----------------------------------------------------------
+-- Channel Tracking (Polyfill for UnitChannelInfo in 1.12)
+----------------------------------------------------------
+local SE_ChannelFrame = CreateFrame("Frame")
+ScriptExtender_ChannelInfo = { name = nil, endTime = 0 }
+
+SE_ChannelFrame:RegisterEvent("SPELLCAST_CHANNEL_START")
+SE_ChannelFrame:RegisterEvent("SPELLCAST_CHANNEL_STOP")
+SE_ChannelFrame:RegisterEvent("SPELLCAST_CHANNEL_UPDATE")
+
+SE_ChannelFrame:SetScript("OnEvent", function()
+    if event == "SPELLCAST_CHANNEL_START" then
+        -- arg1 is duration in ms
+        ScriptExtender_ChannelInfo.endTime = GetTime() + (arg1 / 1000)
+
+        -- Infer name from last cast action if recent
+        if ScriptExtender_LastCastAction and ScriptExtender_LastCastTime and (GetTime() - ScriptExtender_LastCastTime) < 2.0 then
+            ScriptExtender_ChannelInfo.name = ScriptExtender_LastCastAction
+        else
+            ScriptExtender_ChannelInfo.name = "Channeling"
+        end
+        ScriptExtender_Log("Channel Started: " .. tostring(ScriptExtender_ChannelInfo.name))
+    elseif event == "SPELLCAST_CHANNEL_STOP" then
+        ScriptExtender_ChannelInfo.name = nil
+        ScriptExtender_ChannelInfo.endTime = 0
+    elseif event == "SPELLCAST_CHANNEL_UPDATE" then
+        if arg1 == 0 then
+            ScriptExtender_ChannelInfo.name = nil
+            ScriptExtender_ChannelInfo.endTime = 0
+        else
+            ScriptExtender_ChannelInfo.endTime = GetTime() + (arg1 / 1000)
+        end
+    end
+end)
+
+if not UnitChannelInfo then
+    function UnitChannelInfo(unit)
+        if unit == "player" and ScriptExtender_ChannelInfo.endTime and ScriptExtender_ChannelInfo.endTime > GetTime() then
+            return ScriptExtender_ChannelInfo.name, nil, nil, nil, ScriptExtender_ChannelInfo.endTime, nil
+        end
+        return nil
+    end
+end

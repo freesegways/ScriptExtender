@@ -7,7 +7,10 @@ ScriptExtender_Tests["WarlockAnalyze_Marks"] = function(t)
 
     -- Mocks
     t.Mock("UnitLevel", function(u) return 60 end)
-    t.Mock("UnitHealth", function(u) return 2000 end)
+    t.Mock("UnitHealth", function(u)
+        if u == "player" then return 400 end
+        return 2000
+    end)
     t.Mock("UnitHealthMax", function(u) return 2000 end)
     t.Mock("UnitName", function(u) return "Mob" end)
     t.Mock("GetTime", function() return 1000 end)
@@ -50,14 +53,18 @@ ScriptExtender_Tests["WarlockAnalyze_Marks"] = function(t)
     -- Assert Specific Values to confirm calculation logic
     -- Base Scores: Skull=105, Cross=100, None=90
     -- Decay: -5 (Index 1)
-    -- Siphon Bonus (Prio>=3): +10
-    -- Skull: 105 - 5 + 10 = 110
-    -- Cross: 100 - 5 + 10 = 105
-    -- None:   90 - 5 + 0  = 85
+    -- Assert Specific Values to confirm calculation logic
+    -- Base Scores: Skull=105, Cross=100, None=90
+    -- Decay: -5 (Index 1)
+    -- Siphon Bonus (Always): +20
+    -- Prio Boost (Prio>=4? No, BaseScore adjustment)
+    -- Skull (Prio 4): Base 105 - 5 + 20 = 120
+    -- Cross (Prio 3): Base 100 - 5 + 20 = 115
+    -- None (Prio 2):  Base 90  - 5 + 20 = 105
 
-    t.AssertEqual(110, scoreSkull, "Skull Score should be 110")
-    t.AssertEqual(105, scoreCross, "Cross Score should be 105")
-    t.AssertEqual(85, scoreNone, "None Score should be 85")
+    t.AssertEqual(120, scoreSkull, "Skull Score should be 120")
+    t.AssertEqual(115, scoreCross, "Cross Score should be 115")
+    t.AssertEqual(105, scoreNone, "None Score should be 105")
 
     t.Assert(scoreSkull > scoreCross, "Skull Score should be higher than Cross")
     t.Assert(scoreCross > scoreNone, "Cross Score should be higher than None")

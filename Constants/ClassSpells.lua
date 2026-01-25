@@ -1198,17 +1198,18 @@ local SpellLevels = {
             { name = "Shadow Bolt (Rank 9)",       learnCost = 24000, powerCost = 370,  min = 455,        max = 508,      type = "Damage", castTime = 3.0, duration = 0 },
         },
         [60] = {
-            { name = "Shadow Bolt (Rank 10)",          learnCost = 26000, powerCost = 380,  min = 482,        max = 539,      type = "Damage", castTime = 3.0, duration = 0 },
+            { name = "Shadow Bolt (Rank 10)",          learnCost = 26000, powerCost = 380,  min = 482,        max = 539,      type = "Damage", castTime = 3.0,  duration = 0 },
             { name = "Demon Armor (Rank 5)",           learnCost = 26000, powerCost = 0,    type = "Buff",    castTime = 0,   duration = 1800 },
             { name = "Create Soulstone (Major)",       learnCost = 26000, powerCost = 1980, type = "Utility", castTime = 3.0, duration = 0 },
-            { name = "Curse of Doom",                  learnCost = 26000, powerCost = 380,  min = 3200,       max = 3200,     type = "Damage", castTime = 0,   duration = 60 },
-            { name = "Immolate (Rank 7)",              learnCost = 26000, powerCost = 370,  min = 258,        max = 258,      type = "Damage", castTime = 2.0, duration = 15 },
+            { name = "Curse of Doom",                  learnCost = 26000, powerCost = 380,  min = 3200,       max = 3200,     type = "Damage", castTime = 0,    duration = 60 },
+            { name = "Immolate (Rank 7)",              learnCost = 26000, powerCost = 370,  min = 258,        max = 258,      type = "Damage", castTime = 2.0,  duration = 15 },
             { name = "Create Spellstone (Major)",      learnCost = 26000, powerCost = 1750, type = "Utility", castTime = 3.0, duration = 0 },
+            { name = "Dark Harvest",                   learnCost = 11000, powerCost = 230,  min = 704,        max = 704,      type = "Damage", castTime = 7.44, duration = 7.44 }, -- Channel, resets on kill
             { name = "Dark Pact (Rank 3)",             learnCost = 1300,  powerCost = 0,    type = "Utility", castTime = 0,   duration = 0 },
             { name = "Curse of the Elements (Rank 3)", learnCost = 26000, powerCost = 200,  type = "Utility", castTime = 0,   duration = 300 },
-            { name = "Conflagrate (Rank 4)",           learnCost = 1300,  powerCost = 360,  min = 510,        max = 638,      type = "Damage", castTime = 0,   duration = 0 },
+            { name = "Conflagrate (Rank 4)",           learnCost = 1300,  powerCost = 360,  min = 510,        max = 638,      type = "Damage", castTime = 0,    duration = 0 },
             { name = "Health Funnel (Rank 7)",         learnCost = 26000, powerCost = 0,    type = "Heal",    castTime = 10,  duration = 10 },
-            { name = "Soul Fire (Rank 3)",             learnCost = 2000,  powerCost = 0,    min = 0,          max = 0,        type = "Damage", castTime = 6.0, duration = 0 }, -- Placeholder, usually book
+            { name = "Soul Fire (Rank 3)",             learnCost = 2000,  powerCost = 0,    min = 0,          max = 0,        type = "Damage", castTime = 6.0,  duration = 0 }, -- Placeholder, usually book
         },
     },
 

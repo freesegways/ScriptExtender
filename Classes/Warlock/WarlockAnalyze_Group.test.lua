@@ -8,7 +8,10 @@ ScriptExtender_Tests["WarlockAnalyze_GroupLogic"] = function(t)
         if u == "player" then return 60 end
         return currentMob.level
     end)
-    t.Mock("UnitHealth", function(u) return currentMob.hp end)
+    t.Mock("UnitHealth", function(u)
+        if u == "player" then return 400 end -- 40% HP to enable Siphon Life
+        return currentMob.hp
+    end)
     t.Mock("UnitHealthMax", function(u) return currentMob.hpMax end)
     t.Mock("UnitName", function(u) return currentMob.name end)
     t.Mock("GetTime", function() return 1000 end)
@@ -26,6 +29,10 @@ ScriptExtender_Tests["WarlockAnalyze_GroupLogic"] = function(t)
     t.Mock("ScriptExtender_GetSpellDamage", function() return 100 end)
     t.Mock("GetSpellCooldown", function() return 0, 0, 1 end)
     t.Mock("ScriptExtender_HasTalent", function(n) return true end) -- All talents
+    -- Mock Priority (Force Normal Prio 2)
+    t.Mock("ScriptExtender_GetTargetPriority", function(u) return 2 end)
+    -- Mock Spell Learned (Assume all learned)
+    t.Mock("ScriptExtender_IsSpellLearned", function(n) return true end)
     WD_Track = {}
 
     -- Group Mocks (Mutable)

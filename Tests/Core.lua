@@ -20,6 +20,7 @@ end
 
 local function AssertEqual(actual, expected, msg)
     if actual ~= expected then
+        msg = msg or "Assertion Failed"
         ScriptExtender_Print("[FAIL] " ..
             msg .. " (Expected: " .. tostring(expected) .. ", Got: " .. tostring(actual) .. ")")
         CurrentTestFailed = true
