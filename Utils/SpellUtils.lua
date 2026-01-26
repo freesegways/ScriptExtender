@@ -2,6 +2,10 @@
 
 ScriptExtender_SpellUtils = {}
 
+-- Scanner Tooltip for Action identification
+local scanner = CreateFrame("GameTooltip", "ScriptExtenderScanTooltip", nil, "GameTooltipTemplate")
+scanner:SetOwner(WorldFrame, "ANCHOR_NONE")
+
 --- Retrieves the data for the highest rank of a spell available to the player.
 -- @param baseName The base name of the spell (e.g., "Shadowburn").
 -- @param class The class to look up (default: player's class).
@@ -181,4 +185,44 @@ end
 function ScriptExtender_IsSpellLearned(spellName)
     local id = ScriptExtender_GetSpellID(spellName)
     return (id ~= nil)
+end
+
+ScriptExtender_ActionSlotCache = {}
+
+function ScriptExtender_FindSpellActionSlot(spellName)
+    if ScriptExtender_ActionSlotCache[spellName] then
+        local i = ScriptExtender_ActionSlotCache[spellName]
+        -- Verify it hasn't changed (simple texture check is efficient, exact name check is rigorous)
+        -- We'll trust cache for now to avoid perf hit, or clear it occasionally?
+        -- Let's just return cached.
+        return i
+    end
+
+    for i = 1, 120 do
+        if HasAction(i) then
+            scanner:ClearLines()
+            scanner:SetAction(i)
+            local txt = ScriptExtenderScanTooltipTextLeft1:GetText()
+            if txt == spellName then
+                ScriptExtender_ActionSlotCache[spellName] = i
+                return i
+            end
+        end
+    end
+    return nil
+end
+
+--- Checks if a spell is in range of the CURRENT TARGET.
+-- Requires the spell to be on an action bar.
+-- @param spellName Name of the spell.
+-- @return boolean|nil True if in range, False if out of range, Nil if unknown (not on bar).
+function ScriptExtender_IsSpellInRange(spellName)
+    local slot = ScriptExtender_FindSpellActionSlot(spellName)
+    if slot then
+        local valid = IsActionInRange(slot)
+        if valid == 1 then return true end
+        if valid == 0 then return false end
+        -- valid is nil if action is not applicable index?
+    end
+    return nil
 end

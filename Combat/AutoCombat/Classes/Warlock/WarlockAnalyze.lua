@@ -10,6 +10,7 @@ local function HasSpell(name)
 end
 
 function ScriptExtender_Warlock_Analyze(params)
+    print("DEBUG: WarlockAnalyze ENTERED: unit=" .. tostring(params.unit) .. " pull=" .. tostring(params.allowManualPull))
     local u = params.unit
     local allowManualPull = params.allowManualPull
     local ctx = params.context
@@ -18,9 +19,15 @@ function ScriptExtender_Warlock_Analyze(params)
     -- Use Context for validation if available (fallback to raw if nil)
     if not ctx then ctx = ScriptExtender_GetCombatContext(u) end
 
-    if not ctx.targetHP then return nil, nil, -1000 end -- Invalid unit
+    if not ctx.targetHP then
+        print("TRACE: Rejection 1 - No targetHP")
+        return nil, nil, -1000
+    end
 
-    if ctx.isDead or ctx.isFriend then return nil, nil, -1000 end
+    if ctx.isDead or ctx.isFriend then
+        print("TRACE: Rejection 2 - Dead/Friend")
+        return nil, nil, -1000
+    end
 
     -- Combat Status Enforcer (Unless Manual Target)
     -- Context doesn't strictly track if *this specific unit* is in combat in the generic block,
@@ -31,17 +38,27 @@ function ScriptExtender_Warlock_Analyze(params)
     -- I wrote: `ctx.inCombat = UnitAffectingCombat("player")`.
     -- I did NOT write target combat status. I should fix that or keep raw check.
     -- keeping raw check for now for safety.
-    if not allowManualPull and not UnitAffectingCombat(u) and u ~= "target" then return nil, nil, -1000 end
+    if not allowManualPull and not UnitAffectingCombat(u) and u ~= "target" then
+        print("TRACE: Rejection 3 - OOC Safety")
+        return nil, nil, -1000
+    end
 
     -- Range Check Use Context
     -- Warlock wants ~30-36y.
-    -- Context has buckets for 10, 28, and defaults to 100.
-    -- If we are beyond 28 but not '100', we'll assume we are in the 30-35y sweet spot.
-    if ctx.range > 35 then return nil, nil, -1000 end
+    -- Context has buckets for 10, 28, and refined estimates for 30/36 via Action slots.
+
+    -- STRICT RANGE: Even for Manual Pull, to avoid casting on out-of-range mobs
+    -- We allow up to 36y (Talented Range).
+    -- If ctx.range is 100, it means > 28y AND > 30y/36y (if action slots checked).
+    -- EXCEPTION: If Manual Pull, we allow it (User takes responsibility for range).
+    if not allowManualPull and ctx.range > 36 then
+        return nil, nil, -1000
+    end
 
     -- Channel Protection
     local c = UnitChannelInfo("player")
-    if c == "Drain Soul" or c == "Rain of Fire" or c == "Hellfire" or c == "Dark Harvest" or c == "Drain Life" then
+    if c then
+        print("TRACE: Rejection 5 - Channeling")
         return nil, nil, -1000
     end
 

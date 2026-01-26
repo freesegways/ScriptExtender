@@ -3,10 +3,12 @@
 
 function ScriptExtender_AutoCombat_Run(actors)
     -- actors: Array of { analyzer = function, onExecute = function }
+    if not actors then return end
+
     local tm = GetTime()
     local best = {}
     for i, _ in ipairs(actors) do
-        best[i] = { score = -999, action = nil, type = nil, prio = 0, targetName = nil }
+        best[i] = { score = -999, action = nil, type = nil, prio = 0, targetName = nil, targetPseudoID = nil }
     end
 
     local maxPrioSeen = 0
@@ -20,13 +22,23 @@ function ScriptExtender_AutoCombat_Run(actors)
         local u = "target"
         local n = UnitName(u)
 
-        -- Get Context for Manual Unit
-        local ctx = ScriptExtender_GetCombatContext(u)
+        -- Get Context for Manual Unit (Force Refresh to ensure accurate data)
+        -- SKIP SCANNING: We are focused on a manual target, do NOT run environment scan (TargetNearestEnemy loop).
+        local ctx = ScriptExtender_GetCombatContext(u, true)
+        -- Capture ID for matching later
+        local pid = ctx.pseudoID
 
         for idx, actor in ipairs(actors) do
             local action, type, score = actor.analyzer({ unit = u, allowManualPull = true, context = ctx })
             if score and score > best[idx].score then
-                best[idx] = { score = score, action = action, type = type, targetName = n, strict = false }
+                best[idx] = {
+                    score = score,
+                    action = action,
+                    type = type,
+                    targetName = n,
+                    targetPseudoID = pid, -- Store ID
+                    strict = false
+                }
             end
         end
     end
@@ -34,14 +46,32 @@ function ScriptExtender_AutoCombat_Run(actors)
     -- 2. AUTO SCANNING
     -- Check if we found a valid manual target action (Manual Override)
     local manualOverride = false
-    for idx, b in ipairs(best) do
-        if b.targetName and b.targetName == UnitName("target") then
-            -- If manual target is OOC, we override scan (Player wants to pull this specific mob)
-            -- If manual target is IN COMBAT, we allow scan to proceed (Check for better targets like Healers)
-            if not UnitAffectingCombat("target") then
-                manualOverride = true
+
+    -- FORCE OVERRIDE: If we have a valid OOC enemy target, NEVER scan.
+    -- This prevents tabbing away to identical mobs (PseudoID collision) during pulls.
+    if UnitExists("target") and not UnitIsDead("target") and not UnitIsFriend(P, "target") and not UnitAffectingCombat("target") then
+        manualOverride = true
+    end
+
+    local curPseudoID = nil
+    if ScriptExtender_GetPseudoID then curPseudoID = ScriptExtender_GetPseudoID("target") end
+
+    if not manualOverride then
+        for idx, b in ipairs(best) do
+            local match = false
+            if b.targetPseudoID and curPseudoID then
+                if b.targetPseudoID == curPseudoID then match = true end
             end
-            break
+
+            if match then
+                -- If manual target is IN COMBAT, we allow scan to proceed (Check for better targets like Healers)
+                -- (OOC case covered above)
+                local targetInCombat = UnitAffectingCombat("target")
+                if not targetInCombat then
+                    manualOverride = true
+                end
+                break
+            end
         end
     end
 
@@ -55,7 +85,7 @@ function ScriptExtender_AutoCombat_Run(actors)
             local valid = UnitExists(u) and UnitAffectingCombat(u) and not UnitIsFriend(P, u) and not UnitIsDead(u)
 
             if valid then
-                -- Get Context for Scanned Unit
+                -- Get Context for Scanned Unit (Force Refresh for high precision scanning)
                 local ctx = ScriptExtender_GetCombatContext(u, true)
 
                 for idx, actor in ipairs(actors) do
@@ -78,6 +108,7 @@ function ScriptExtender_AutoCombat_Run(actors)
                                 targetName = n,
                                 targetLevel = UnitLevel(u),
                                 targetMaxHP = UnitHealthMax(u),
+                                targetPseudoID = ctx.pseudoID,
                                 strict = true
                             }
                         end
@@ -100,29 +131,52 @@ function ScriptExtender_AutoCombat_Run(actors)
 
     -- Phase 2: EXECUTION
     -- Heuristic: After scanning, if we found good actions and have ANY valid target, execute.
-    -- We don't need perfect name matching - trust the scan results.
 
-    -- If we found actions but don't have a target, grab one
-    local anyBestAction = false
-    for idx, _ in ipairs(actors) do
-        if best[idx].action and best[idx].score > -100 then
-            anyBestAction = true
-            break
+    local anyNeedsAutoTarget = false
+    local manualActionExists = false
+    for idx, b in ipairs(best) do
+        if b.action and b.score > -100 then
+            if b.strict then
+                anyNeedsAutoTarget = true
+            else
+                manualActionExists = true
+            end
         end
     end
 
-    if anyBestAction and not (UnitExists("target") and UnitAffectingCombat("target") and not UnitIsDead("target") and not UnitIsFriend(P, "target")) then
-        TargetNearestEnemy() -- Grab any valid enemy
+    -- Only auto-target if we have ONLY auto-scan actions and no valid combat target.
+    -- If we have a manual action, we NEVER want to change our target.
+    if anyNeedsAutoTarget and not manualActionExists then
+        if not (UnitExists("target") and UnitAffectingCombat("target") and not UnitIsDead("target") and not UnitIsFriend(P, "target")) then
+            TargetNearestEnemy()
+        end
     end
 
     local anyActionExecuted = false
     for idx, actor in ipairs(actors) do
         local b = best[idx]
         if b.action and b.score > -100 then
-            -- Check if SOME valid target exists (might not be the exact one we scanned, but close enough)
-            if UnitExists("target") and UnitAffectingCombat("target") and not UnitIsDead("target") and not UnitIsFriend(P, "target") then
-                actor.onExecute(b.action, b.targetName, tm)
-                anyActionExecuted = true
+            -- Validate current target
+            if UnitExists("target") and not UnitIsDead("target") and not UnitIsFriend(P, "target") then
+                -- Match check: Ensure we are still targeting who we analyzed
+                -- (Skip for strict/auto-scan as they might have been targeted by Phase 2 auto-target)
+                if b.strict or ScriptExtender_IsTargetMatch(b, "target") then
+                    -- Requirement: Auto-scanned targets MUST be in combat. Manual targets can be OOC (Pulling).
+                    local combatPass = not b.strict or UnitAffectingCombat("target")
+
+                    if combatPass then
+                        -- Final Identity Check before casting:
+                        -- If we have a PseudoID, verify it matches the current target.
+                        -- This prevents casting on a mob with the same name but different state (e.g. Swapped Boars).
+                        if b.targetPseudoID and b.targetPseudoID ~= ScriptExtender_GetPseudoID("target") then
+                            -- Mismatch! We likely tabbed to a different mob with same name. Abort.
+                            ScriptExtender_Print("DEBUG: PseudoID Mismatch. Aborting cast.")
+                        else
+                            actor.onExecute(b.action, b.targetName, tm)
+                            anyActionExecuted = true
+                        end
+                    end
+                end
             end
         end
     end
@@ -131,12 +185,8 @@ function ScriptExtender_AutoCombat_Run(actors)
     -- If we engaged no action, and we were in Auto-Scan mode (no manual override),
     -- we might be left targeting a random OOC mob from the scan loop. Clear it.
     if not anyActionExecuted and not manualOverride then
-        if UnitExists("target") and not UnitIsDead("target") then
-            -- Check if this accidental target is combat-valid?
-            -- If it's OOC, we definitely want to drop it to be safe.
-            if not UnitAffectingCombat("target") then
-                ClearTarget()
-            end
+        if UnitExists("target") and not UnitIsDead("target") and not UnitAffectingCombat("target") then
+            ClearTarget()
         end
     end
 
@@ -147,6 +197,8 @@ end
 
 function ScriptExtender_IsTargetMatch(b, unit)
     if not UnitExists(unit) then return false end
-    if b.targetName and b.targetName ~= UnitName(unit) then return false end
-    return true
+    if b.targetPseudoID and ScriptExtender_GetPseudoID then
+        return b.targetPseudoID == ScriptExtender_GetPseudoID(unit)
+    end
+    return false
 end

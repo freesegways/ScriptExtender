@@ -127,6 +127,8 @@ function GetNumRaidMembers() return 0 end
 
 function UnitClassification(u) return "normal" end
 
+function ScriptExtender_GetPseudoID(u) return "Generic_ID" end
+
 -- Constants
 BOOKTYPE_SPELL = "spell"
 

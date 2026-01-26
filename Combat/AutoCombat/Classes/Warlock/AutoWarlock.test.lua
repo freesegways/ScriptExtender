@@ -18,7 +18,10 @@ ScriptExtender_Tests["AutoWarlock_FullCycle"] = function(t)
     }
 
     -- Standard Mocks
-    t.Mock("UnitClass", function(u) return "Warlock", "WARLOCK" end) -- Ensure class is Warlock
+    t.Mock("UnitClass", function(u) return "Warlock", "WARLOCK" end)
+    t.Mock("HasAction", function(i) return false end)
+    t.Mock("IsActionInRange", function(i) return 1 end)
+    t.Mock("UnitSex", function(u) return 0 end)
     t.Mock("GetTime", function() return 1000 end)
     t.Mock("UnitHealth", function(u)
         if u == "player" then return 1000 end
@@ -140,6 +143,10 @@ ScriptExtender_Tests["AutoWarlock_CC_Safety"] = function(t)
     -- Only one mob, and it is CC'd
     local mob = { name = "SheepedBoy", hp = 100, max = 100, mark = 1, debuffs = { "Polymorph" }, combat = true }
     local currentTarget = nil
+    t.Mock("UnitClass", function(u) return "Warlock", "WARLOCK" end)
+    t.Mock("HasAction", function(i) return false end)
+    t.Mock("IsActionInRange", function(i) return 1 end)
+    t.Mock("UnitSex", function(u) return 0 end)
 
     t.Mock("GetTime", function() return 1000 end)
     t.Mock("UnitExists", function(u) return u == "pet" or (u == "target" and currentTarget ~= nil) end)
@@ -189,6 +196,9 @@ ScriptExtender_Tests["AutoWarlock_ManualTarget_OOC"] = function(t)
     -- Because Player IS IN COMBAT, we skip the "Safe" checks and allow engaging new targets if manually selected.
     -- (Auto-targeting usually avoids OOC, but manual target overrides).
     local mob = { name = "Peaceful", combat = false }
+    t.Mock("UnitClass", function(u) return "Warlock", "WARLOCK" end)
+    t.Mock("HasAction", function(i) return false end)
+    t.Mock("IsActionInRange", function(i) return 1 end)
 
     t.Mock("GetTime", function() return 1000 end)
     t.Mock("UnitExists", function(u) return u == "pet" or (u == "target" and currentTarget ~= nil) end)
@@ -225,6 +235,11 @@ ScriptExtender_Tests["AutoWarlock_ManualTarget_OOC"] = function(t)
 
     ScriptExtender_GetTargetPriority = function() return 1 end
 
+    t.Mock("ScriptExtender_GetPseudoID", function(u)
+        if u == "target" then return "Peaceful_ID" end
+        return "Unknown_ID"
+    end)
+
     AutoWarlock()
 
     t.Assert(table.getn(castSpells) == 0, "Should NOT cast on OOC target while we are in combat (Safety Logic).")
@@ -243,16 +258,28 @@ ScriptExtender_Tests["AutoWarlock_ManualPull_OOC"] = function(t)
         return false
     end)
 
+    t.Mock("UnitClass", function(u) return "Warlock", "WARLOCK" end)
+    t.Mock("CheckInteractDistance", function(u, i) return true end)
     t.Mock("UnitExists", function(u)
         if u == "target" and state.target then return true end
+        if u == "pettarget" and state.target then return true end
         if u == "pet" then return true end
         return false
     end)
 
+    t.Mock("UnitIsDead", function(u) return false end)
     t.Mock("UnitIsFriend", function(p, u) return false end)
+    t.Mock("HasAction", function(i) return false end)
+    t.Mock("IsActionInRange", function(i) return 1 end)
+    t.Mock("UnitIsUnit", function(a, b) return a == b end)
+    t.Mock("UnitIsPlayer", function(u) return u == "player" end)
+    t.Mock("UnitChannelInfo", function(u) return nil end)
+    t.Mock("UnitSex", function(u) return 0 end)
     t.Mock("UnitName", function(u)
-        if u == "target" and state.target then return state.target.name end
-        return "Unknown"
+        local val = "Unknown"
+        if u == "target" and state.target then val = state.target.name end
+        print("DEBUG MOCK UnitName(" .. tostring(u) .. ") -> " .. tostring(val))
+        return val
     end)
 
     t.Mock("UnitHealth", function(u) return 1000 end)
@@ -268,14 +295,39 @@ ScriptExtender_Tests["AutoWarlock_ManualPull_OOC"] = function(t)
     t.Mock("GetContainerNumSlots", function() return 0 end)
     t.Mock("GetRaidTargetIndex", function() return 0 end)
 
-    t.Mock("CastSpellByName", function(s) table.insert(castSpells, s) end)
-    t.Mock("PetAttack", function() table.insert(petActions, "Attack") end)
+    t.Mock("CastSpellByName", function(s)
+        table.insert(castSpells, s)
+    end)
+    t.Mock("PetAttack", function()
+        table.insert(petActions, "Attack")
+    end)
     t.Mock("PetFollow", function() end)
     t.Mock("TargetNearestEnemy", function() end) -- No scanning
-    t.Mock("ClearTarget", function() state.target = nil end)
+    t.Mock("ClearTarget", function()
+        state.target = nil
+    end)
+    t.Mock("IsAutoRepeatAction", function() return false end)
+
+    t.Mock("ScriptExtender_GetPseudoID", function(u)
+        if u == "target" and state.target then return "PeacefulPull_ID" end
+        return "Unknown_ID"
+    end)
 
     ScriptExtender_GetTargetPriority = function() return 1 end
     t.Mock("GetMobDistribution", function() return 0, {} end)
+    t.Mock("GetPartyRangeStats", function() return { ["player"] = true } end)
+    t.Mock("GetPartyHealthStats", function() return {} end)
+    t.Mock("GetNumPartyMembers", function() return 0 end)
+    t.Mock("GetNumRaidMembers", function() return 0 end)
+    t.Mock("GetSpellCooldown", function(...) return 0, 0, 0 end)
+    t.Mock("ScriptExtender_HasTalent", function() return false end)
+    t.Mock("ScriptExtender_Print", function(msg) print("PRINT: " .. msg) end)
+    t.Mock("ScriptExtender_Log", function(msg) print("LOG: " .. msg) end)
+
+    -- Mock Spell Learning
+    t.Mock("ScriptExtender_IsSpellLearned", function(n) return true end)
+    t.Mock("ScriptExtender_GetSpellID", function(n) return 1 end)
+    t.Mock("ScriptExtender_IsSpellReady", function(n) return true end)
 
     -- Call AutoWarlock with manual OOC target
     AutoWarlock()
@@ -292,6 +344,98 @@ ScriptExtender_Tests["AutoWarlock_ManualPull_OOC"] = function(t)
     t.Assert(petAttacked, "Pet should attack manually targeted OOC mob.")
 end
 
+ScriptExtender_Tests["AutoWarlock_ManualPull_PreventsScan"] = function(t)
+    -- TEST: If manual OOC target is valid, we must NOT scan other mobs.
+    local scanCalls = 0
+    local castSpells = {}
+    local state = { target = { name = "PeacefulPull", combat = false } }
+
+    -- Reset Throttling Globals
+    ScriptExtender_LastCastAction = nil
+    ScriptExtender_LastCastTime = 0
+
+    -- Player OOC
+    t.Mock("UnitAffectingCombat", function(u)
+        if u == "player" then return false end
+        if u == "target" and state.target then return state.target.combat end
+        return false
+    end)
+
+    t.Mock("UnitName", function(u)
+        if u == "target" and state.target then return state.target.name end
+        return nil
+    end)
+
+    -- Spy on Scanner
+    t.Mock("TargetNearestEnemy", function()
+        scanCalls = scanCalls + 1
+    end)
+
+    -- Standard Mocks for valid execution
+    t.Mock("UnitExists", function(u) return u == "target" or u == "pet" end)
+    t.Mock("UnitIsDead", function() return false end)
+    t.Mock("UnitIsFriend", function() return false end)
+    t.Mock("UnitClass", function() return "Warlock", "WARLOCK" end)
+    t.Mock("HasAction", function() return true end)
+    t.Mock("IsActionInRange", function() return 1 end)
+    t.Mock("UnitHealth", function() return 100 end)
+    t.Mock("UnitHealthMax", function() return 100 end)
+    t.Mock("UnitMana", function() return 100 end)
+    t.Mock("UnitManaMax", function() return 100 end)
+    t.Mock("UnitLevel", function() return 60 end)
+    t.Mock("UnitClassification", function() return "normal" end)
+    t.Mock("UnitCreatureFamily", function() return "Imp" end)
+    t.Mock("UnitPowerType", function() return 0 end)
+    t.Mock("GetContainerNumSlots", function() return 0 end)
+    t.Mock("UnitBuff", function() return nil end)
+    t.Mock("UnitDebuff", function() return nil end)
+    t.Mock("GetTime", function() return 1000 end)
+    t.Mock("UnitSex", function() return 0 end)
+
+    t.Mock("CastSpellByName", function(s) table.insert(castSpells, s) end)
+    t.Mock("PetAttack", function() end)
+    t.Mock("PetFollow", function() end)
+
+    t.Mock("ScriptExtender_GetPseudoID", function(u)
+        if u == "target" and state.target then return "PeacefulPull_ID" end
+        return "Unknown_ID"
+    end)
+    -- FORCE GLOBAL for AutoCombat visibility
+    ScriptExtender_GetPseudoID = function(u)
+        if u == "target" and state.target then return "PeacefulPull_ID" end
+        return "Unknown_ID"
+    end
+
+    -- Mocks for Context/Analyze
+    t.Mock("GetMobDistribution", function() return 0, {} end)
+    t.Mock("GetPartyRangeStats", function() return {} end)
+    t.Mock("GetPartyHealthStats", function() return {} end)
+    t.Mock("GetNumPartyMembers", function() return 0 end)
+    t.Mock("GetNumRaidMembers", function() return 0 end)
+    t.Mock("GetSpellCooldown", function() return 0, 0, 0 end)
+    t.Mock("CheckInteractDistance", function() return true end)
+    t.Mock("ScriptExtender_IsSpellLearned", function() return true end)
+    t.Mock("ScriptExtender_GetSpellID", function() return 1 end)
+    t.Mock("ScriptExtender_IsSpellReady", function() return true end)
+    t.Mock("ScriptExtender_HasTalent", function() return false end)
+    t.Mock("ScriptExtender_Print", function() end)
+    t.Mock("ScriptExtender_Log", function() end)
+
+    ScriptExtender_GetTargetPriority = function() return 1 end
+
+    -- Reset globals after mock
+    local original_IsSpellInRange = ScriptExtender_IsSpellInRange
+    ScriptExtender_IsSpellInRange = function() return true end
+
+    AutoWarlock()
+
+    -- Restore
+    ScriptExtender_IsSpellInRange = original_IsSpellInRange
+
+    t.Assert(scanCalls == 0, "CRITICAL: Should NOT have scanned targets. call count: " .. scanCalls)
+    t.Assert(table.getn(castSpells) > 0, "Should have cast a spell on the manual target.")
+end
+
 ScriptExtender_Tests["AutoWarlock_IgnoreOOCTargets"] = function(t)
     local castSpells = {}
     local currentTarget = nil
@@ -303,6 +447,10 @@ ScriptExtender_Tests["AutoWarlock_IgnoreOOCTargets"] = function(t)
         { name = "Aggressive", combat = true }
     }
     local scanIdx = 0
+    t.Mock("UnitClass", function(u) return "Warlock", "WARLOCK" end)
+    t.Mock("HasAction", function(i) return false end)
+    t.Mock("IsActionInRange", function(i) return 1 end)
+    t.Mock("UnitSex", function(u) return 0 end)
 
     t.Mock("GetTime", function() return 1000 end)
     t.Mock("UnitExists", function(u) return u == "pet" or (u == "target" and currentTarget ~= nil) end)
@@ -338,6 +486,13 @@ ScriptExtender_Tests["AutoWarlock_IgnoreOOCTargets"] = function(t)
     t.Mock("ClearTarget", function() currentTarget = nil end)
     t.Mock("CastSpellByName", function(s) table.insert(castSpells, s) end)
     t.Mock("PetAttack", function() end)
+
+    t.Mock("ScriptExtender_GetPseudoID", function(u)
+        if u == "target" and currentTarget then
+            return currentTarget.name .. "_ID" -- "Peaceful_ID" or "Aggressive_ID"
+        end
+        return "Unknown_ID"
+    end)
 
     ScriptExtender_GetTargetPriority = function() return 1 end -- Mock global
 
@@ -407,6 +562,11 @@ ScriptExtender_Tests["AutoWarlock_ClearsLeftoverOOCTarget"] = function(t)
     t.Mock("ClearTarget", function()
         currentTarget = nil
         clearedTarget = true
+    end)
+
+    t.Mock("ScriptExtender_GetPseudoID", function(u)
+        if u == "target" and currentTarget then return "Peaceful_ID" end
+        return "Unknown_ID"
     end)
 
     t.Mock("PetAttack", function() table.insert(petActions, "Attack") end)
