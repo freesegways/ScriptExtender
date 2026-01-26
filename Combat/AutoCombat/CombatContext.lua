@@ -75,14 +75,9 @@ local function UpdateFrameCache(tm, skipScan)
     return ctx
 end
 
-function ScriptExtender_GetCombatContext(unit, skipScan)
+-- NEW: Fetch Global Data Only (Optimized)
+function ScriptExtender_GetGlobalContext(skipScan)
     local tm = GetTime()
-
-    -- 1. Fetch Global Data (Cached if same frame)
-    -- IMPORTANT: If we are asking to skipScan (Manual Pull Check), we should use a temporary cache or force update without corrupting the main frame cache?
-    -- If main cache alreay exists, use it (it has full scan data).
-    -- If main cache DOES NOT exist, and we skipScan, we generate a partial cache. We must NOT save it as the 'frameCache' because it's incomplete.
-
     local globalData = nil
 
     if frameCache.tm == tm and frameCache.data then
@@ -100,13 +95,14 @@ function ScriptExtender_GetCombatContext(unit, skipScan)
             globalData = frameCache.data
         end
     end
+    return globalData
+end
 
-    -- 2. Create Context (Merge Global + Unit Specific)
+-- NEW: Enrich Context with Unit Data (Zero-Copy using Metatable)
+function ScriptExtender_EnrichContext(globalCtx, unit, skipScan)
     local ctx = {}
-    if globalData then
-        for k, v in pairs(globalData) do
-            ctx[k] = v
-        end
+    if globalCtx then
+        setmetatable(ctx, { __index = globalCtx })
     end
 
     -- 3. TARGET STATUS (Always Fresh for the specific unit)
@@ -135,7 +131,8 @@ function ScriptExtender_GetCombatContext(unit, skipScan)
         end
 
         -- Refine Range using Action Bar checks (Only works for "target")
-        if unit == "target" then
+        -- OPTIMIZATION: Skip expensive checks check if requested
+        if unit == "target" and not skipScan then
             -- 1. Check Wand/Gun (Generic)
             if ScriptExtender_IsSpellInRange("Shoot") then
                 if ctx.range > 30 then ctx.range = 30 end
@@ -174,6 +171,12 @@ function ScriptExtender_GetCombatContext(unit, skipScan)
         end
     end
 
-    ctx.tm = tm
+    ctx.tm = GetTime()
     return ctx
+end
+
+-- Compatibility Wrapper
+function ScriptExtender_GetCombatContext(unit, skipScan)
+    local g = ScriptExtender_GetGlobalContext(skipScan)
+    return ScriptExtender_EnrichContext(g, unit, skipScan)
 end

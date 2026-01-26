@@ -76,7 +76,10 @@ function ScriptExtender_AutoCombat_Run(actors)
     end
 
     if not actors.disableScan and not manualOverride then
-        for i = 1, 25 do
+        -- OPTIMIZATION: Fetch Global Context ONCE (skipScan=true for speed)
+        local globalCtx = ScriptExtender_GetGlobalContext(true)
+
+        for i = 1, 20 do -- OPTIMIZATION: Scan 10 nearest mobs
             TargetNearestEnemy()
             local u = "target"
             local n = UnitName(u) or "Unknown"
@@ -85,8 +88,8 @@ function ScriptExtender_AutoCombat_Run(actors)
             local valid = UnitExists(u) and UnitAffectingCombat(u) and not UnitIsFriend(P, u) and not UnitIsDead(u)
 
             if valid then
-                -- Get Context for Scanned Unit (Force Refresh for high precision scanning)
-                local ctx = ScriptExtender_GetCombatContext(u, true)
+                -- Get Context for Scanned Unit (Lightweight enrichment)
+                local ctx = ScriptExtender_EnrichContext(globalCtx, u, true)
 
                 for idx, actor in ipairs(actors) do
                     -- Pass allowManualPull=FALSE (Strict) to prevent auto-pulling OOC mobs

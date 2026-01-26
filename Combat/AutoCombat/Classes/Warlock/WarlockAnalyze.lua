@@ -11,7 +11,7 @@ end
 
 function ScriptExtender_Warlock_Analyze(params)
     ScriptExtender_Log("WarlockAnalyze ENTERED: unit=" ..
-    tostring(params.unit) .. " pull=" .. tostring(params.allowManualPull))
+        tostring(params.unit) .. " pull=" .. tostring(params.allowManualPull))
     local u = params.unit
     local allowManualPull = params.allowManualPull
     local ctx = params.context
@@ -94,15 +94,22 @@ function ScriptExtender_Warlock_Analyze(params)
         end
     })
 
-    -- 2. DRAIN SOUL (Execute / Shard)
+    -- 2. DRAIN SOUL (Execute / Heavy Damage Filler)
     table.insert(candidates, {
         name = "Drain Soul",
         type = "kill",
-        base = 90,
+        base = 40, -- Filler Priority (Beats Shoot=20, Shadow Bolt=35)
         cond = function()
-            -- Only Execute Range.
-            if hpPct > 20 then return false end
+            -- Execute Range Boost
+            if hpPct <= 20 then return 90 end -- Return specific score for execute
+
+            -- As filler
+            if myMana < 10 then return false end -- Save mana if critically low
             return HasSpell("Drain Soul")
+        end,
+        scoreMod = function(s)
+            if s == 90 then return s end -- Preserve execute score
+            return s
         end
     })
 
@@ -124,9 +131,14 @@ function ScriptExtender_Warlock_Analyze(params)
         type = "dot",
         base = 70,
         cond = function()
-            if isLowHP then return false end                            -- Don't waste on dying
+            if isLowHP then return false end
+            -- Check for Agony (Sargeras) OR Elements (ChillTouch/Malediction)
             if ScriptExtender_HasDebuff(u, "CurseOfSargeras") then return false end
-            if HasSpell("Malediction") and isBoss then return false end -- Prefer Elements/Shadow on Boss
+            if ScriptExtender_HasDebuff(u, "ChillTouch") then return false end -- Detection for Elements??
+            -- Also check Name if texture fails
+            if ScriptExtender_HasDebuff(u, "Curse of the Elements") then return false end
+
+            if HasSpell("Malediction") and isBoss then return false end
             return HasSpell("Curse of Agony")
         end
     })
@@ -138,7 +150,7 @@ function ScriptExtender_Warlock_Analyze(params)
         base = 75,
         cond = function()
             if not HasSpell("Malediction") then return false end
-            if ScriptExtender_HasDebuff(u, "ChillTouch") then return false end
+            if ScriptExtender_HasDebuff(u, "ChillTouch") or ScriptExtender_HasDebuff(u, "Curse of the Elements") then return false end
             return true
         end
     })
@@ -155,14 +167,22 @@ function ScriptExtender_Warlock_Analyze(params)
         end
     })
 
-    -- 6. SHADOW BOLT (Nightfall Only)
+    -- 6. SHADOW BOLT (Nightfall / Filler)
     table.insert(candidates, {
         name = "Shadow Bolt",
         type = "fill",
-        base = 100, -- High Priority if proc
+        base = 35, -- Beats Shoot(20)
         cond = function()
-            if ScriptExtender_HasBuff("player", "Spell_Shadow_Twilight") then return true end
-            return false -- Only on proc
+            -- Nightfall Proc (Optimization)
+            if ScriptExtender_HasBuff("player", "Spell_Shadow_Twilight") then return 100 end
+
+            -- Standard Cast
+            if myMana > 15 then return true end
+            return false
+        end,
+        scoreMod = function(s)
+            if s == 100 then return s end -- Proc priority
+            return s
         end
     })
 
@@ -182,7 +202,8 @@ function ScriptExtender_Warlock_Analyze(params)
         type = "self",
         base = 0, -- Calc dynamic
         cond = function()
-            if myHP < 50 or myMana > 80 then return false end
+            -- Only tap if missing significant mana (avoid topping off)
+            if myHP < 50 or myMana > 60 then return false end
             return true
         end,
         scoreMod = function(s) return 100 - myMana end -- Score = Deficit
