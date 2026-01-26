@@ -10,7 +10,8 @@ local function HasSpell(name)
 end
 
 function ScriptExtender_Warlock_Analyze(params)
-    print("DEBUG: WarlockAnalyze ENTERED: unit=" .. tostring(params.unit) .. " pull=" .. tostring(params.allowManualPull))
+    ScriptExtender_Log("WarlockAnalyze ENTERED: unit=" ..
+    tostring(params.unit) .. " pull=" .. tostring(params.allowManualPull))
     local u = params.unit
     local allowManualPull = params.allowManualPull
     local ctx = params.context
@@ -20,12 +21,12 @@ function ScriptExtender_Warlock_Analyze(params)
     if not ctx then ctx = ScriptExtender_GetCombatContext(u) end
 
     if not ctx.targetHP then
-        print("TRACE: Rejection 1 - No targetHP")
+        ScriptExtender_Log("TRACE: Rejection 1 - No targetHP")
         return nil, nil, -1000
     end
 
     if ctx.isDead or ctx.isFriend then
-        print("TRACE: Rejection 2 - Dead/Friend")
+        ScriptExtender_Log("TRACE: Rejection 2 - Dead/Friend")
         return nil, nil, -1000
     end
 
@@ -39,7 +40,7 @@ function ScriptExtender_Warlock_Analyze(params)
     -- I did NOT write target combat status. I should fix that or keep raw check.
     -- keeping raw check for now for safety.
     if not allowManualPull and not UnitAffectingCombat(u) and u ~= "target" then
-        print("TRACE: Rejection 3 - OOC Safety")
+        ScriptExtender_Log("TRACE: Rejection 3 - OOC Safety")
         return nil, nil, -1000
     end
 
@@ -58,7 +59,7 @@ function ScriptExtender_Warlock_Analyze(params)
     -- Channel Protection
     local c = UnitChannelInfo("player")
     if c then
-        print("TRACE: Rejection 5 - Channeling")
+        ScriptExtender_Log("TRACE: Rejection 5 - Channeling")
         return nil, nil, -1000
     end
 

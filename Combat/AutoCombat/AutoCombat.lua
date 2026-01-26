@@ -121,7 +121,7 @@ function ScriptExtender_AutoCombat_Run(actors)
     -- Debug: Print what we found
     for idx, b in ipairs(best) do
         if b.action then
-            print("DEBUG BEST[" ..
+            ScriptExtender_Log("BEST[" ..
                 idx ..
                 "]: " ..
                 b.action ..
@@ -170,7 +170,7 @@ function ScriptExtender_AutoCombat_Run(actors)
                         -- This prevents casting on a mob with the same name but different state (e.g. Swapped Boars).
                         if b.targetPseudoID and b.targetPseudoID ~= ScriptExtender_GetPseudoID("target") then
                             -- Mismatch! We likely tabbed to a different mob with same name. Abort.
-                            ScriptExtender_Print("DEBUG: PseudoID Mismatch. Aborting cast.")
+                            ScriptExtender_Log("PseudoID Mismatch. Aborting cast.")
                         else
                             actor.onExecute(b.action, b.targetName, tm)
                             anyActionExecuted = true
