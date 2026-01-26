@@ -11,11 +11,6 @@ function AutoWarlock()
     end
 
     -- 2. UNIFIED COMBAT LOOP
-    -- Refresh context distribution (Census)
-    if GetMobDistribution then
-        GetMobDistribution()
-    end
-
     -- Analyzers now handle self-needs (like Life Tap) and targeting priority.
     local actors = {
         {

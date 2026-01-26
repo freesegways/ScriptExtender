@@ -110,6 +110,11 @@ ScriptExtender_Tests["AutoWarlock_FullCycle"] = function(t)
     t.Mock("GetNumPartyMembers", function() return 0 end)
     t.Mock("GetNumRaidMembers", function() return 0 end)
 
+    -- Mock Mob Distribution to avoid TargetNearestEnemy side effects
+    t.Mock("GetMobDistribution", function()
+        return 1, { ["player"] = 1 }
+    end)
+
     -- TEST: Target prioritization and simultaneous pet command
     AutoWarlock()
 

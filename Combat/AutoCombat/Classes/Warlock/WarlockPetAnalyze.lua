@@ -20,12 +20,21 @@ local function IsPetSpellReady(spellName)
     return false
 end
 
-function ScriptExtender_Warlock_PetAnalyze(u, forceOOC, tm)
+function ScriptExtender_Warlock_PetAnalyze(u, forceOOC, ctx)
     local P = "player"
-    if not UnitExists(u) or UnitIsDead(u) or UnitIsFriend(P, u) then return nil, nil, -999 end
 
-    -- forceOOC=true allows OOC targets. If false, we require combat.
-    if not forceOOC and not UnitAffectingCombat(u) then return nil, nil, -999 end
+    -- Use context if available, otherwise raw checks (backwards compat)
+    if ctx then
+        if ctx.isDead or ctx.isFriend then return nil, nil, -999 end
+        if not forceOOC and ctx.targetHP and ctx.targetHP > 0 then
+            -- Context doesn't strictly track if target is in combat, so check raw
+            if not UnitAffectingCombat(u) then return nil, nil, -999 end
+        end
+    else
+        -- Fallback to raw checks if no context
+        if not UnitExists(u) or UnitIsDead(u) or UnitIsFriend(P, u) then return nil, nil, -999 end
+        if not forceOOC and not UnitAffectingCombat(u) then return nil, nil, -999 end
+    end
 
     -- CC Check (Using global CC list)
     for i = 1, 16 do

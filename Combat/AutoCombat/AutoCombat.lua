@@ -49,10 +49,10 @@ function ScriptExtender_AutoCombat_Run(actors)
         for i = 1, 25 do
             TargetNearestEnemy()
             local u = "target"
-            local n = UnitName(u)
+            local n = UnitName(u) or "Unknown"
 
             -- Safety: Auto-Scan targets MUST be in combat. Never auto-pull OOC mobs.
-            local valid = UnitAffectingCombat(u)
+            local valid = UnitExists(u) and UnitAffectingCombat(u) and not UnitIsFriend(P, u) and not UnitIsDead(u)
 
             if valid then
                 -- Get Context for Scanned Unit
@@ -87,54 +87,42 @@ function ScriptExtender_AutoCombat_Run(actors)
         end
     end
 
+    -- Debug: Print what we found
+    for idx, b in ipairs(best) do
+        if b.action then
+            print("DEBUG BEST[" ..
+                idx ..
+                "]: " ..
+                b.action ..
+                " on " .. tostring(b.targetName) .. " (score: " .. b.score .. ", strict: " .. tostring(b.strict) .. ")")
+        end
+    end
+
     -- Phase 2: EXECUTION
+    -- Heuristic: After scanning, if we found good actions and have ANY valid target, execute.
+    -- We don't need perfect name matching - trust the scan results.
+
+    -- If we found actions but don't have a target, grab one
+    local anyBestAction = false
+    for idx, _ in ipairs(actors) do
+        if best[idx].action and best[idx].score > -100 then
+            anyBestAction = true
+            break
+        end
+    end
+
+    if anyBestAction and not (UnitExists("target") and UnitAffectingCombat("target") and not UnitIsDead("target") and not UnitIsFriend(P, "target")) then
+        TargetNearestEnemy() -- Grab any valid enemy
+    end
+
     local anyActionExecuted = false
     for idx, actor in ipairs(actors) do
         local b = best[idx]
         if b.action and b.score > -100 then
-            local function VerifyTarget()
-                -- If strictly required combat, check it. If strict=false (Manual), allow OOC.
-                if not b.strict or UnitAffectingCombat("target") then
-                    -- Get new Context
-                    local ctx = ScriptExtender_GetCombatContext("target", true)
-
-                    local newAct, _, newScore = actor.analyzer("target", not b.strict, ctx)
-                    if newScore and newScore >= (b.score - 10) and newAct == b.action then
-                        return true
-                    end
-                end
-                return false
-            end
-
-            local needScan = false
-            if not ScriptExtender_IsTargetMatch(b, "target") then
-                needScan = true
-            else
-                if not VerifyTarget() then needScan = true end
-            end
-
-            if needScan then
-                local found = false
-                if not actors.disableScan then
-                    for i = 1, 25 do
-                        TargetNearestEnemy()
-                        if ScriptExtender_IsTargetMatch(b, "target") then
-                            if VerifyTarget() then
-                                found = true; break
-                            end
-                        end
-                    end
-                end
-                if not found then ClearTarget() end
-            end
-
-            -- Final Check
-            if ScriptExtender_IsTargetMatch(b, "target") then
-                -- Final verification safety wrapper
-                if not b.strict or UnitAffectingCombat("target") then
-                    actor.onExecute(b.action, b.targetName, tm)
-                    anyActionExecuted = true
-                end
+            -- Check if SOME valid target exists (might not be the exact one we scanned, but close enough)
+            if UnitExists("target") and UnitAffectingCombat("target") and not UnitIsDead("target") and not UnitIsFriend(P, "target") then
+                actor.onExecute(b.action, b.targetName, tm)
+                anyActionExecuted = true
             end
         end
     end

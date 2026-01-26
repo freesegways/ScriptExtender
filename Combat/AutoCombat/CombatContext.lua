@@ -4,17 +4,17 @@
 
 ScriptExtender_Register("CombatContext", "Centralized combat context gathering.")
 
-local contextCache = {
-    tm = 0,
-    unit = nil,
-    data = nil
-}
+local lastMobDistTime = 0
+local lastMobDistCount = 0
+local lastMobDistData = {}
+local contextCache = { tm = 0, unit = nil, unitName = nil, data = nil }
 
 function ScriptExtender_GetCombatContext(unit, forceRefresh)
     local tm = GetTime()
+    local unitName = UnitName(unit)
 
     -- Return cached frame data if available for same unit
-    if not forceRefresh and contextCache.tm == tm and contextCache.unit == unit and contextCache.data then
+    if not forceRefresh and contextCache.tm == tm and contextCache.unit == unit and contextCache.unitName == unitName and contextCache.data then
         return contextCache.data
     end
 
@@ -22,19 +22,23 @@ function ScriptExtender_GetCombatContext(unit, forceRefresh)
     ctx.tm = tm
     ctx.player = "player"
     ctx.target = unit
+    ctx.targetName = unitName
 
     -- 1. GROUP & ENVIRONMENT UTILITIES
-    -- Mob Distribution (Threat/Density)
+    -- Mob Distribution (Threat/Density) - Frame Caching logic
     if GetMobDistribution then
-        local count, dist = GetMobDistribution()
-        ctx.mobCount = count
-        ctx.mobDistribution = dist
-        ctx.attackersOnPlayer = dist["player"] or 0
-        ctx.attackersOnPet = dist["pet"] or 0
+        if lastMobDistTime ~= tm then
+            lastMobDistCount, lastMobDistData = GetMobDistribution()
+            lastMobDistTime = tm
+        end
+        ctx.mobCount = lastMobDistCount
+        ctx.mobDistribution = lastMobDistData
+        ctx.attackersOnPlayer = lastMobDistData["player"] or 0
+        ctx.attackersOnPet = lastMobDistData["pet"] or 0
         -- Simple Healer Aggro heuristic (assuming party numbers match roster roles, vaguely)
         -- TODO: Real role detection
         ctx.attackersOnParty = 0
-        for k, v in pairs(dist) do
+        for k, v in pairs(lastMobDistData) do
             if string.sub(k, 1, 5) == "party" then
                 ctx.attackersOnParty = ctx.attackersOnParty + v
             end
@@ -44,6 +48,28 @@ function ScriptExtender_GetCombatContext(unit, forceRefresh)
         ctx.mobDistribution = {}
         ctx.attackersOnPlayer = 0
     end
+
+    -- 2. TARGET STATS (critical for analyzers)
+    ctx.targetHP = UnitHealth(unit) or 0
+    ctx.targetMaxHP = UnitHealthMax(unit) or 1
+    ctx.targetHPPct = (ctx.targetHP / ctx.targetMaxHP) * 100
+    ctx.targetMana = UnitMana(unit) or 0
+    local targetManaMax = UnitManaMax(unit) or 1
+    ctx.targetManaPct = (ctx.targetMana / targetManaMax) * 100
+    ctx.inCombat = UnitAffectingCombat("player")
+    ctx.isDead = UnitIsDead and UnitIsDead(unit) or false
+    ctx.isFriend = UnitIsFriend("player", unit)
+    ctx.isBoss = UnitClassification(unit) == "worldboss" or UnitClassification(unit) == "rareelite" or
+        UnitClassification(unit) == "elite"
+    ctx.range = CheckInteractDistance(unit, 4) and 10 or (CheckInteractDistance(unit, 3) and 28 or 100)
+
+    -- Player stats
+    ctx.playerHP = UnitHealth("player") or 0
+    ctx.playerMaxHP = UnitHealthMax("player") or 1
+    ctx.playerHPPct = (ctx.playerHP / ctx.playerMaxHP) * 100
+    ctx.playerMana = UnitMana("player") or 0
+    local playerManaMax = UnitManaMax("player") or 1
+    ctx.playerManaPct = (ctx.playerMana / playerManaMax) * 100
 
     -- Party Health Velocity
     if GetPartyHealthStats then
@@ -102,9 +128,12 @@ function ScriptExtender_GetCombatContext(unit, forceRefresh)
         end
     end
 
+    ctx.targetName = unitName
+
     -- Update Cache
     contextCache.tm = tm
     contextCache.unit = unit
+    contextCache.unitName = unitName
     contextCache.data = ctx
 
     return ctx

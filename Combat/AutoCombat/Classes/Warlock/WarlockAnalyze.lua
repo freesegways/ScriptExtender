@@ -30,12 +30,10 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, ctx)
     if not forceOOC and not UnitAffectingCombat(u) and u ~= "target" then return nil, nil, -1000 end
 
     -- Range Check Use Context
-    -- Context has `ctx.range` (buckets 10, 28, 100).
-    -- Warlock wants 30-36y.
-    -- If ctx.range > 35ish...
-    -- Original check: CheckInteractDistance(u, 4) -> 28y.
-    -- Context has this precached as ctx.range <= 28.
-    if ctx.range > 28 then return nil, nil, -1000 end
+    -- Warlock wants ~30-36y.
+    -- Context has buckets for 10, 28, and defaults to 100.
+    -- If we are beyond 28 but not '100', we'll assume we are in the 30-35y sweet spot.
+    if ctx.range > 35 then return nil, nil, -1000 end
 
     -- Channel Protection
     local c = UnitChannelInfo("player")
@@ -182,10 +180,6 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, ctx)
                 bestType = c.type
             end
         end
-    end
-
-    if bestScore > 0 then
-        ScriptExtender_Print("DEBUG: WINNER: " .. bestName .. " (" .. bestScore .. ")")
     end
 
     return bestName, bestType, bestScore
