@@ -24,7 +24,7 @@ function ScriptExtender_AutoCombat_Run(actors)
         local ctx = ScriptExtender_GetCombatContext(u)
 
         for idx, actor in ipairs(actors) do
-            local action, type, score = actor.analyzer(u, true, ctx) -- Pass Context!
+            local action, type, score = actor.analyzer({ unit = u, allowManualPull = true, context = ctx })
             if score and score > best[idx].score then
                 best[idx] = { score = score, action = action, type = type, targetName = n, strict = false }
             end
@@ -59,8 +59,8 @@ function ScriptExtender_AutoCombat_Run(actors)
                 local ctx = ScriptExtender_GetCombatContext(u, true)
 
                 for idx, actor in ipairs(actors) do
-                    -- Pass ForceOOC=FALSE (Strict) to prevent auto-pulling OOC mobs
-                    local action, type, score = actor.analyzer(u, false, ctx)
+                    -- Pass allowManualPull=FALSE (Strict) to prevent auto-pulling OOC mobs
+                    local action, type, score = actor.analyzer({ unit = u, allowManualPull = false, context = ctx })
 
                     if score and score > best[idx].score then
                         -- Track max priority ...

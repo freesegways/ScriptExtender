@@ -9,8 +9,10 @@ if not ScriptExtender_ScanTooltip then
 end
 
 -- 1. ANALYZER
-function ScriptExtender_ManaWand_Analyze(u, forceOOC, ctx)
-    local isScanning = not forceOOC
+function ScriptExtender_ManaWand_Analyze(params)
+    local u = params.unit
+    local allowManualPull = params.allowManualPull
+    local isScanning = not allowManualPull
 
     -- Prerequisites check
     if not UnitExists(u) or UnitIsDead(u) or not UnitCanAttack("player", u) then

@@ -230,6 +230,68 @@ ScriptExtender_Tests["AutoWarlock_ManualTarget_OOC"] = function(t)
     t.Assert(table.getn(castSpells) == 0, "Should NOT cast on OOC target while we are in combat (Safety Logic).")
 end
 
+ScriptExtender_Tests["AutoWarlock_ManualPull_OOC"] = function(t)
+    -- TEST: Player is OOC, manually targets an OOC mob, should PULL it
+    local castSpells = {}
+    local petActions = {}
+    local state = { target = { name = "PeacefulTarget", combat = false } }
+
+    -- Player is NOT in combat
+    t.Mock("UnitAffectingCombat", function(u)
+        if u == "player" then return false end -- Player OOC
+        if u == "target" and state.target then return state.target.combat end
+        return false
+    end)
+
+    t.Mock("UnitExists", function(u)
+        if u == "target" and state.target then return true end
+        if u == "pet" then return true end
+        return false
+    end)
+
+    t.Mock("UnitIsFriend", function(p, u) return false end)
+    t.Mock("UnitName", function(u)
+        if u == "target" and state.target then return state.target.name end
+        return "Unknown"
+    end)
+
+    t.Mock("UnitHealth", function(u) return 1000 end)
+    t.Mock("UnitHealthMax", function(u) return 1000 end)
+    t.Mock("UnitMana", function(u) return 500 end)
+    t.Mock("UnitManaMax", function(u) return 500 end)
+    t.Mock("UnitLevel", function(u) return 60 end)
+    t.Mock("UnitClassification", function(u) return "normal" end)
+    t.Mock("UnitCreatureFamily", function() return "Imp" end)
+    t.Mock("UnitPowerType", function() return 0 end)
+    t.Mock("UnitBuff", function() return nil end)
+    t.Mock("UnitDebuff", function() return nil end)
+    t.Mock("GetContainerNumSlots", function() return 0 end)
+    t.Mock("GetRaidTargetIndex", function() return 0 end)
+
+    t.Mock("CastSpellByName", function(s) table.insert(castSpells, s) end)
+    t.Mock("PetAttack", function() table.insert(petActions, "Attack") end)
+    t.Mock("PetFollow", function() end)
+    t.Mock("TargetNearestEnemy", function() end) -- No scanning
+    t.Mock("ClearTarget", function() state.target = nil end)
+
+    ScriptExtender_GetTargetPriority = function() return 1 end
+    t.Mock("GetMobDistribution", function() return 0, {} end)
+
+    -- Call AutoWarlock with manual OOC target
+    AutoWarlock()
+
+    -- EXPECT: Should cast something (pull the mob)
+    t.Assert(table.getn(castSpells) > 0,
+        "Should PULL manually targeted OOC mob when player is OOC. Cast count: " .. table.getn(castSpells))
+
+    -- EXPECT: Pet should attack
+    local petAttacked = false
+    for _, a in ipairs(petActions) do
+        if a == "Attack" then petAttacked = true end
+    end
+    t.Assert(petAttacked, "Pet should attack manually targeted OOC mob.")
+end
+
 ScriptExtender_Tests["AutoWarlock_IgnoreOOCTargets"] = function(t)
     local castSpells = {}
     local currentTarget = nil

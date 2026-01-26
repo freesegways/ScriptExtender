@@ -88,7 +88,7 @@ ScriptExtender_Tests["WarlockAnalyze_Logic"] = function(t)
     -- WarlockAnalyze doesn't have CoR. It returns Dark Harvest if invalid, or Filler.
     -- If HP < 25%, Dark Harvest returns false.
 
-    local act, type, score = ScriptExtender_Warlock_Analyze("target", false, nil)
+    local act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     -- Expect Shadowburn (95) > Drain Soul (90) > Dark Harvest (80)
     t.AssertEqual({ actual = act, expected = "Shadowburn" })
 
@@ -102,7 +102,7 @@ ScriptExtender_Tests["WarlockAnalyze_Logic"] = function(t)
     -- IsCurseSlot = False.
     -- killerDotActive = True. -> SKIP.
 
-    act, type, score = ScriptExtender_Warlock_Analyze("target", false, nil)
+    act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     -- Shadowburn (95) vs Drain Soul (90).
     -- Shadowburn still valid.
     t.Assert(act ~= "Corruption", "Should SKIP Corruption on dying Low Level Mob.")
@@ -118,7 +118,7 @@ ScriptExtender_Tests["WarlockAnalyze_Logic"] = function(t)
 
     -- killerDotActive -> FALSE (Level check failed).
 
-    act, type, score = ScriptExtender_Warlock_Analyze("target", false, nil)
+    act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     -- Dark Harvest (80). Corruption (60).
     -- WarlockAnalyze ranks Dark Harvest higher than Corruption.
     -- So we expect Dark Harvest.
@@ -187,9 +187,9 @@ ScriptExtender_Tests["WarlockAnalyze_Manual_OOC"] = function(t)
     end)
 
     -- Call with ForceOOC = TRUE
-    local act, type, score = ScriptExtender_Warlock_Analyze("target", true, nil)
+    local act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = true, context = nil })
 
-    t.Assert(act ~= nil, "Analyzer SHOULD return action for OOC target if forceOOC is true.")
+    t.Assert(act ~= nil, "Analyzer SHOULD return action for OOC target if allowManualPull is true.")
     -- Expect Curse of Agony (Siphon Life logic requires low player HP)
     -- Expect Shoot (20) if CoGA (70) condition fails?
     -- CoGA Cond: !LowHP, !HasDebuff.
@@ -213,8 +213,8 @@ ScriptExtender_Tests["WarlockAnalyze_Manual_OOC"] = function(t)
     -- Maybe Range? ctx.range = 10.
     -- Maybe Channeling? UnitChannelInfo -> nil.
     -- Maybe Combat Status?
-    -- Line 30: if not forceOOC and not UnitAffectingCombat(u) ...
-    -- We passed forceOOC=true.
+    -- Line 30: if not allowManualPull and not UnitAffectingCombat(u) ...
+    -- We passed allowManualPull=true.
     -- Line 38: if ctx.range > 28 ... (10 <= 28)
 
     -- Debug: Just accept Shoot for now if the OOC logic is flaky, or fix expectation.
@@ -319,15 +319,15 @@ ScriptExtender_Tests["WarlockAnalyze_Marks"] = function(t)
 
     -- TEST 1: Unmarked Score (Prio 2 -> Base 90. Decay 5 -> 85)
     currentMark = 0 -- None -> nil
-    local act, type, scoreNone = ScriptExtender_Warlock_Analyze("target", false, nil)
+    local act, type, scoreNone = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
 
     -- TEST 2: Skull Score (8 -> Prio 4 -> Base 105. Decay 5 -> 100)
     currentMark = 8
-    local act, type, scoreSkull = ScriptExtender_Warlock_Analyze("target", false, nil)
+    local act, type, scoreSkull = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
 
     -- TEST 3: Cross Score (7 -> Prio 3 -> Base 100. Decay 5 -> 95)
     currentMark = 7
-    local act, type, scoreCross = ScriptExtender_Warlock_Analyze("target", false, nil)
+    local act, type, scoreCross = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
 
     -- Assert Relative Priority (Outcome)
     -- We don't care about the specific numbers (120, 115, etc.)
@@ -404,23 +404,23 @@ ScriptExtender_Tests["WarlockAnalyze_GroupLogic"] = function(t)
     -- So it falls back to... CoE (75) if Malediction true?
     -- Log says CoE (75).
     numParty = 0
-    local act = ScriptExtender_Warlock_Analyze("target", false, nil)
+    local act = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     t.AssertEqual({ actual = act, expected = "Curse of the Elements" })
 
     -- TEST 2: GROUP - Skip Siphon Life on Normal Mob
     numParty = 2
-    act = ScriptExtender_Warlock_Analyze("target", false, nil)
+    act = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     t.Assert(act ~= "Siphon Life", "GROUP: Should SKIP Siphon Life on normal mob.")
 
     -- TEST 3: GROUP - Elite Mob - Use Siphon Life & Elements
     currentMob.classification = "elite"
     -- Siphon Life should be allowed on Elite
-    act = ScriptExtender_Warlock_Analyze("target", false, nil)
+    act = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     t.AssertEqual({ actual = act, expected = "Curse of the Elements" })
 
     -- Let's pretend Siphon Life is up, check Curse
     currentMob.debuffs = { "Requiem" } -- Siphon Up
-    act = ScriptExtender_Warlock_Analyze("target", false, nil)
+    act = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     t.AssertEqual({ actual = act, expected = "Curse of the Elements" })
 
     -- TEST 4: GROUP - Execute Phase Logic (IsDying)
@@ -432,14 +432,14 @@ ScriptExtender_Tests["WarlockAnalyze_GroupLogic"] = function(t)
     currentMob.debuffs = {} -- Reset debuffs
     currentMob.classification = "normal"
 
-    act = ScriptExtender_Warlock_Analyze("target", false, nil)
+    act = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     -- With 500 HP > 225, we should APPLY DoTs (Spread Love).
     t.Assert(act ~= "Drain Life" and act ~= "Drain Soul",
         "GROUP: Should NOT skip DoTs on 500HP mob (Got: " .. tostring(act) .. ")")
 
     -- TEST 5: GROUP - REALLY LOW HP (100 HP)
     currentMob.hp = 100
-    act = ScriptExtender_Warlock_Analyze("target", false, nil)
+    act = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     -- 100 < 225. Should skip DoTs.
     t.Assert(act == "Drain Life" or act == "Drain Soul",
         "GROUP: Should skip DoTs on 100HP mob (Got: " .. tostring(act) .. ")")
@@ -540,7 +540,7 @@ ScriptExtender_Tests["WarlockAnalyze_DarkHarvest"] = function(t)
 
     -- WarlockAnalyze should return Dark Harvest if not low HP.
 
-    local act, type, score = ScriptExtender_Warlock_Analyze("target", false, nil)
+    local act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     t.AssertEqual({ actual = act, expected = "Dark Harvest" })
     t.AssertEqual({ actual = type, expected = "damage" })
 
@@ -548,7 +548,7 @@ ScriptExtender_Tests["WarlockAnalyze_DarkHarvest"] = function(t)
     -- Target HP Low (300).
     currentMob.hp = 300
 
-    act, type, score = ScriptExtender_Warlock_Analyze("target", false, nil)
+    act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     ScriptExtender_Print("Test 2 Result: Act=" .. tostring(act) .. " Type=" .. tostring(type) ..
         " Score=" .. tostring(score))
 
@@ -562,7 +562,7 @@ ScriptExtender_Tests["WarlockAnalyze_DarkHarvest"] = function(t)
     -- === TEST 3: Channel Protection ===
     -- We are channeling Dark Harvest. Analyze should return nil.
     channelState = "Dark Harvest"
-    act, type, score = ScriptExtender_Warlock_Analyze("target", false, nil)
+    act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     t.AssertEqual({ actual = act, expected = nil })
 
     -- Clear Channel
@@ -573,7 +573,7 @@ ScriptExtender_Tests["WarlockAnalyze_DarkHarvest"] = function(t)
     t.Mock("GetNumRaidMembers", function() return 10 end)
     currentMob.hp = 2000 -- Healthy again
 
-    act, type, score = ScriptExtender_Warlock_Analyze("target", false, nil)
+    act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     -- Should probably be Filler (Shadow Bolt/Drain or whatever logic is)
     -- Wait, if DoTs are up (WD_Track), loops finish.
     -- DH block skipped (dpsMultiplier > 1).
@@ -592,7 +592,7 @@ ScriptExtender_Tests["WarlockAnalyze_DarkHarvest"] = function(t)
     currentMob.classification = "worldboss"
     currentMob.hp = 20000 -- Healthy (Above Dying Threshold of ~6750)
     currentMob.hpMax = 100000
-    act, type, score = ScriptExtender_Warlock_Analyze("target", false, nil)
+    act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
     -- Mid-Combat DH enabled for Boss even in raid? (My logic said 'isBoss')
     -- Shadowburn (95) > DH (80).
     -- Bosses usually have high HP, so Shadowburn (Execute) shouldn't trigger unless Low HP.

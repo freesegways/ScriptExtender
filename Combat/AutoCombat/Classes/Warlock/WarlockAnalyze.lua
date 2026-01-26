@@ -9,7 +9,11 @@ local function HasSpell(name)
     return ScriptExtender_IsSpellLearned(name)
 end
 
-function ScriptExtender_Warlock_Analyze(u, forceOOC, ctx)
+function ScriptExtender_Warlock_Analyze(params)
+    local u = params.unit
+    local allowManualPull = params.allowManualPull
+    local ctx = params.context
+
     local pl = "player"
     -- Use Context for validation if available (fallback to raw if nil)
     if not ctx then ctx = ScriptExtender_GetCombatContext(u) end
@@ -27,7 +31,7 @@ function ScriptExtender_Warlock_Analyze(u, forceOOC, ctx)
     -- I wrote: `ctx.inCombat = UnitAffectingCombat("player")`.
     -- I did NOT write target combat status. I should fix that or keep raw check.
     -- keeping raw check for now for safety.
-    if not forceOOC and not UnitAffectingCombat(u) and u ~= "target" then return nil, nil, -1000 end
+    if not allowManualPull and not UnitAffectingCombat(u) and u ~= "target" then return nil, nil, -1000 end
 
     -- Range Check Use Context
     -- Warlock wants ~30-36y.
