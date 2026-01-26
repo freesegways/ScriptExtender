@@ -1,7 +1,7 @@
--- Utils/CombatLoop.lua
+-- Combat/AutCombat/AutoCombat.lua
 -- A reusable targeting loop that can run multiple analyzers (e.g. Player and Pet) in a single pass.
 
-function ScriptExtender_RunCombatLoop(actors)
+function ScriptExtender_AutoCombat_Run(actors)
     -- actors: Array of { analyzer = function, onExecute = function }
     local tm = GetTime()
     local best = {}
@@ -19,8 +19,12 @@ function ScriptExtender_RunCombatLoop(actors)
     if UnitExists("target") and not UnitIsDead("target") and not UnitIsFriend(P, "target") then
         local u = "target"
         local n = UnitName(u)
+
+        -- Get Context for Manual Unit
+        local ctx = ScriptExtender_GetCombatContext(u)
+
         for idx, actor in ipairs(actors) do
-            local action, type, score = actor.analyzer(u, true, tm) -- ForceOOC=TRUE (Allow manual start)
+            local action, type, score = actor.analyzer(u, true, ctx) -- Pass Context!
             if score and score > best[idx].score then
                 best[idx] = { score = score, action = action, type = type, targetName = n, strict = false }
             end
@@ -48,13 +52,15 @@ function ScriptExtender_RunCombatLoop(actors)
             local n = UnitName(u)
 
             -- Safety: Auto-Scan targets MUST be in combat. Never auto-pull OOC mobs.
-            -- If we want to pull an OOC mob, we do it via Manual Target (Phase 1 aka manualOverride).
             local valid = UnitAffectingCombat(u)
 
             if valid then
+                -- Get Context for Scanned Unit
+                local ctx = ScriptExtender_GetCombatContext(u, true)
+
                 for idx, actor in ipairs(actors) do
                     -- Pass ForceOOC=FALSE (Strict) to prevent auto-pulling OOC mobs
-                    local action, type, score = actor.analyzer(u, false, tm)
+                    local action, type, score = actor.analyzer(u, false, ctx)
 
                     if score and score > best[idx].score then
                         -- Track max priority ...
@@ -89,10 +95,10 @@ function ScriptExtender_RunCombatLoop(actors)
             local function VerifyTarget()
                 -- If strictly required combat, check it. If strict=false (Manual), allow OOC.
                 if not b.strict or UnitAffectingCombat("target") then
-                    -- Analyzer expects 'forceOOC'.
-                    -- If strict=false (Manual/AllowOOC), forceOOC should be TRUE.
-                    -- If strict=true (Scan/CombatOnly), forceOOC should be FALSE.
-                    local newAct, _, newScore = actor.analyzer("target", not b.strict, tm)
+                    -- Get new Context
+                    local ctx = ScriptExtender_GetCombatContext("target", true)
+
+                    local newAct, _, newScore = actor.analyzer("target", not b.strict, ctx)
                     if newScore and newScore >= (b.score - 10) and newAct == b.action then
                         return true
                     end
@@ -149,4 +155,10 @@ function ScriptExtender_RunCombatLoop(actors)
     if not UnitExists("target") or UnitIsDead("target") then
         ClearTarget()
     end
+end
+
+function ScriptExtender_IsTargetMatch(b, unit)
+    if not UnitExists(unit) then return false end
+    if b.targetName and b.targetName ~= UnitName(unit) then return false end
+    return true
 end

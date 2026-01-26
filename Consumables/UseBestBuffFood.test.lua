@@ -26,5 +26,5 @@ ScriptExtender_Tests["UseBestBuffFood_Filter_Check"] = function(t)
 
     TURTLE_FOOD_DB = BACKUP_DB -- Restore
 
-    t.AssertEqual(usedSlot, 2, "Should pick Sagefish (Buff Food) and ignore Bread.")
+    t.AssertEqual({ actual = usedSlot, expected = 2 })
 end

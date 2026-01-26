@@ -24,13 +24,14 @@ ScriptExtender_Tests["UseSmartMana_Efficiency_Check"] = function(t)
 
     UseSmartMana()
 
-    t.AssertEqual(usedBag, 0, "Should use Bag 0")
-    t.AssertEqual(usedSlot, 2, "Should use Slot 2 (Efficient Potion).")
+    t.AssertEqual({ actual = usedBag, expected = 0 })
+    t.AssertEqual({ actual = usedSlot, expected = 2 })
 end
 
 ScriptExtender_Tests["UseSmartMana_Panic_Check"] = function(t)
     -- SCENARIO: Max 1000, Curr 50 (5%) -> PANIC
     -- Bag 0, Slot 1: Major Mana (1800) -> Huge waste but allowed due to panic
+    -- Bag 0, Slot 2: Major Mana (1800) -> Huge waste but allowed due to panic
 
     local usedBag, usedSlot = nil, nil
 
@@ -50,6 +51,6 @@ ScriptExtender_Tests["UseSmartMana_Panic_Check"] = function(t)
 
     UseSmartMana()
 
-    t.AssertEqual(usedBag, 0, "Should use Bag 0")
-    t.AssertEqual(usedSlot, 1, "Should use Slot 1 (Major) despite waste.")
+    t.AssertEqual({ actual = usedBag, expected = 0 })
+    t.AssertEqual({ actual = usedSlot, expected = 1 })
 end

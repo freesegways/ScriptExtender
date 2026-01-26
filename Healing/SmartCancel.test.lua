@@ -16,7 +16,7 @@ ScriptExtender_Tests["SmartCancel_Keep_Damage"] = function(t)
     t.Mock("SpellStopCasting", function() cancelled = true end)
 
     SmartCancel()
-    t.AssertEqual(cancelled, false, "Should NOT cancel if target took damage.")
+    t.AssertEqual({ actual = cancelled, expected = false })
 end
 
 ScriptExtender_Tests["SmartCancel_Stop_Full"] = function(t)
@@ -37,7 +37,7 @@ ScriptExtender_Tests["SmartCancel_Stop_Full"] = function(t)
     t.Mock("UIErrorsFrame", fakeFrame) -- Mock the global object
 
     SmartCancel()
-    t.AssertEqual(cancelled, true, "Should cancel if deficit < 200 (Full HP).")
+    t.AssertEqual({ actual = cancelled, expected = true })
 end
 
 ScriptExtender_Tests["SmartCancel_Stop_Sniped"] = function(t)
@@ -61,7 +61,7 @@ ScriptExtender_Tests["SmartCancel_Stop_Sniped"] = function(t)
     t.Mock("UIErrorsFrame", fakeFrame)
 
     SmartCancel()
-    t.AssertEqual(cancelled, true, "Should cancel if heal > deficit and target safe.")
+    t.AssertEqual({ actual = cancelled, expected = true })
 end
 
 ScriptExtender_Tests["SmartCancel_Keep_Snipe_Fail"] = function(t)
@@ -83,5 +83,5 @@ ScriptExtender_Tests["SmartCancel_Keep_Snipe_Fail"] = function(t)
     t.Mock("SpellStopCasting", function() cancelled = true end)
 
     SmartCancel()
-    t.AssertEqual(cancelled, false, "Should NOT cancel if target is still low HP.")
+    t.AssertEqual({ actual = cancelled, expected = false })
 end

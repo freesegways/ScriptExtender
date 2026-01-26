@@ -241,9 +241,9 @@ if RunTests then
         end
     end
 
-    RunTests()
+    local failCount = RunTests()
 
-    if failed then
+    if failed or (failCount and failCount > 0) then
         print("\nTESTS FAILED!")
         os.exit(1)
     else

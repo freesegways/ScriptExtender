@@ -18,11 +18,20 @@ local function Assert(condition, msg)
     end
 end
 
-local function AssertEqual(actual, expected, msg)
+local function AssertEqual(params)
+    if type(params) ~= "table" then
+        ScriptExtender_Print("[ERR] AssertEqual usage error: Expected a table passed as the only argument, got " ..
+            type(params))
+        CurrentTestFailed = true
+        return false
+    end
+
+    local actual = params.actual
+    local expected = params.expected
+
     if actual ~= expected then
-        msg = msg or "Assertion Failed"
-        ScriptExtender_Print("[FAIL] " ..
-            msg .. " (Expected: " .. tostring(expected) .. ", Got: " .. tostring(actual) .. ")")
+        ScriptExtender_Print("[FAIL] Assertion Failed (Expected: " ..
+            tostring(expected) .. ", Got: " .. tostring(actual) .. ")")
         CurrentTestFailed = true
         return false
     else
@@ -62,6 +71,8 @@ function RunTests()
     for n in pairs(ScriptExtender_Tests) do table.insert(testNames, n) end
     table.sort(testNames)
 
+    local failedTests = {}
+
     for _, name in ipairs(testNames) do
         ScriptExtender_Print("Running: " .. name)
         local testFunc = ScriptExtender_Tests[name]
@@ -75,12 +86,14 @@ function RunTests()
         if status then
             if CurrentTestFailed then
                 fail = fail + 1
+                table.insert(failedTests, name)
             else
                 pass = pass + 1
             end
         else
             ScriptExtender_Print("[ERR] " .. name .. ": " .. err)
             fail = fail + 1
+            table.insert(failedTests, name .. " (CRASH)")
         end
 
         -- Cleanup
@@ -88,5 +101,12 @@ function RunTests()
     end
 
     ScriptExtender_Print("Result: " .. pass .. " Passed, " .. fail .. " Failed.")
+    if fail > 0 then
+        ScriptExtender_Print("Failed Tests:")
+        for _, n in ipairs(failedTests) do
+            ScriptExtender_Print(" - " .. n)
+        end
+    end
     ScriptExtender_Print("=== Done ===")
+    return fail
 end

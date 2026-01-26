@@ -44,7 +44,7 @@ ScriptExtender_Tests["UseSmartFood_Pref_Conjured"] = function(t)
     -- Restore
     TURTLE_FOOD_DB = BACKUP_DB
 
-    t.AssertEqual(usedSlot, 2, "Should eat Conjured Sweet Roll (Slot 2) over Quail.")
+    t.AssertEqual({ actual = usedSlot, expected = 2 })
 end
 
 -- 2. EFFICIENCY CHECK
@@ -81,5 +81,5 @@ ScriptExtender_Tests["UseSmartFood_Effectiveness"] = function(t)
     UseSmartFood()
     TURTLE_FOOD_DB = BACKUP_DB
 
-    t.AssertEqual(usedSlot, 3, "Should eat Apple (Slot 3) as it covers 500 deficit efficiently.")
+    t.AssertEqual({ actual = usedSlot, expected = 3 })
 end

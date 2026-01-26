@@ -11,6 +11,11 @@ function AutoWarlock()
     end
 
     -- 2. UNIFIED COMBAT LOOP
+    -- Refresh context distribution (Census)
+    if GetMobDistribution then
+        GetMobDistribution()
+    end
+
     -- Analyzers now handle self-needs (like Life Tap) and targeting priority.
     local actors = {
         {
@@ -19,6 +24,7 @@ function AutoWarlock()
             onExecute = function(action, targetName, tm)
                 -- Global Throttle: Prevent spamming the same action rapidly (e.g. failed casts)
                 if ScriptExtender_LastCastAction == action and (tm - (ScriptExtender_LastCastTime or 0)) < 0.5 then
+                    -- ScriptExtender_Print("DEBUG: Throttled: "..action)
                     return
                 end
 
@@ -32,10 +38,13 @@ function AutoWarlock()
                         ScriptExtender_LastCastTime = tm
                     end
                 elseif ScriptExtender_IsSpellReady(action) then
+                    ScriptExtender_Print("DEBUG: Casting -> " .. action)
                     CastSpellByName(action)
                     ScriptExtender_Warlock_UpdateTracker(action, targetName, tm)
                     ScriptExtender_LastCastAction = action
                     ScriptExtender_LastCastTime = tm
+                else
+                    ScriptExtender_Print("DEBUG: NotReady/Blocked -> " .. action)
                 end
             end
         },
@@ -46,7 +55,7 @@ function AutoWarlock()
         }
     }
 
-    ScriptExtender_RunCombatLoop(actors)
+    ScriptExtender_AutoCombat_Run(actors)
 end
 
 ScriptExtender_Register("AutoWarlock",

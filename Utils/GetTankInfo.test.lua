@@ -14,7 +14,7 @@ ScriptExtender_Tests["GetTankInfo_Buff"] = function(t)
     end)
 
     local name, id = GetTankInfo()
-    t.AssertEqual(id, "party1", "Should identify Bear Form as Tank.")
+    t.AssertEqual({ actual = id, expected = "party1" })
 end
 
 ScriptExtender_Tests["GetTankInfo_HP_Fallback"] = function(t)
@@ -30,5 +30,5 @@ ScriptExtender_Tests["GetTankInfo_HP_Fallback"] = function(t)
     end)
 
     local name, id = GetTankInfo()
-    t.AssertEqual(id, "party2", "Should fallback to highest HP unit.")
+    t.AssertEqual({ actual = id, expected = "party2" })
 end

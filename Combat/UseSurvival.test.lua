@@ -13,7 +13,7 @@ ScriptExtender_Tests["UseSurvival_Panic_Priest"] = function(t)
     t.Mock("UnitDebuff", function() return nil end)
 
     UseSurvival()
-    t.AssertEqual(spellCast, "Power Word: Shield", "Priest should cast Shield in panic.")
+    t.AssertEqual({ actual = spellCast, expected = "Power Word: Shield" })
 end
 
 -- 2. MAGE PANIC (Ice Barrier > Mana Shield)
@@ -32,7 +32,7 @@ ScriptExtender_Tests["UseSurvival_Panic_Mage"] = function(t)
     t.Mock("GetSpellCooldown", function(i) return 0, 0 end) -- Ready
 
     UseSurvival()
-    t.AssertEqual(spellCast, "Ice Barrier", "Mage should cast Ice Barrier.")
+    t.AssertEqual({ actual = spellCast, expected = "Ice Barrier" })
 end
 
 -- 3. ROGUE PANIC (Evasion)
@@ -46,7 +46,7 @@ ScriptExtender_Tests["UseSurvival_Panic_Rogue"] = function(t)
     t.Mock("GetSpellCooldown", function() return 0, 0 end)
 
     UseSurvival()
-    t.AssertEqual(spellCast, "Evasion", "Rogue should cast Evasion.")
+    t.AssertEqual({ actual = spellCast, expected = "Evasion" })
 end
 
 -- 4. POTION EFFICIENCY (Skip Overkill)
@@ -68,7 +68,7 @@ ScriptExtender_Tests["UseSurvival_Potion_Overkill"] = function(t)
     t.Mock("UseContainerItem", function(b, s) usedBag = b end)
 
     UseSurvival()
-    t.AssertEqual(usedBag, nil, "Should NOT use expensive potion for tiny scratch.")
+    t.AssertEqual({ actual = usedBag, expected = nil })
 end
 
 -- 5. COOLDOWN SKIP
@@ -96,7 +96,7 @@ ScriptExtender_Tests["UseSurvival_Skip_Cooldown"] = function(t)
     t.Mock("UseContainerItem", function(b, s) usedSlot = s end)
 
     UseSurvival()
-    t.AssertEqual(usedSlot, 2, "Should skip Slot 1 (CD) and use Slot 2.")
+    t.AssertEqual({ actual = usedSlot, expected = 2 })
 end
 
 -- 6. WARLOCK PANIC (Spellstone)
@@ -118,7 +118,7 @@ ScriptExtender_Tests["UseSurvival_Panic_Warlock_Spellstone"] = function(t)
     t.Mock("UseInventoryItem", function(slot) usedSlot = slot end)
 
     UseSurvival()
-    t.AssertEqual(usedSlot, 17, "Warlock should use Spellstone (Slot 17).")
+    t.AssertEqual({ actual = usedSlot, expected = 17 })
 end
 
 -- 7. WARLOCK PANIC (Death Coil)
@@ -146,7 +146,7 @@ ScriptExtender_Tests["UseSurvival_Panic_Warlock_DeathCoil"] = function(t)
     t.Mock("GetSpellCooldown", function(i) return 0, 0 end)
 
     UseSurvival()
-    t.AssertEqual(spellCast, "Death Coil", "Warlock should cast Death Coil if no Spellstone.")
+    t.AssertEqual({ actual = spellCast, expected = "Death Coil" })
 end
 
 -- 8. PALADIN TANK PANIC (No Bubble)
@@ -172,7 +172,7 @@ ScriptExtender_Tests["UseSurvival_Panic_Paladin_Tank"] = function(t)
     t.Mock("GetSpellCooldown", function(i) return 0, 0 end)
 
     UseSurvival()
-    t.AssertEqual(spellCast, "Lay on Hands", "Paladin Tank should SKIP bubble and cast Lay on Hands.")
+    t.AssertEqual({ actual = spellCast, expected = "Lay on Hands" })
 end
 
 -- 9. PALADIN NORMAL PANIC (Bubble)
@@ -194,7 +194,7 @@ ScriptExtender_Tests["UseSurvival_Panic_Paladin_Normal"] = function(t)
     t.Mock("GetSpellCooldown", function(i) return 0, 0 end)
 
     UseSurvival()
-    t.AssertEqual(spellCast, "Divine Shield", "Paladin Normal should cast Bubble.")
+    t.AssertEqual({ actual = spellCast, expected = "Divine Shield" })
 end
 
 -- 10. WARLOCK SACRIFICE (Panic < 20%)
@@ -219,7 +219,7 @@ ScriptExtender_Tests["UseSurvival_Panic_Warlock_Sacrifice"] = function(t)
     t.Mock("GetSpellCooldown", function(i, book) return 0, 0 end)
 
     UseSurvival()
-    t.AssertEqual(spellCast, "Sacrifice", "Warlock should cast Sacrifice at low HP.")
+    t.AssertEqual({ actual = spellCast, expected = "Sacrifice" })
 end
 
 -- 11. WARLOCK SACRIFICE (Mob Count >= 3)
@@ -246,7 +246,6 @@ ScriptExtender_Tests["UseSurvival_Panic_Warlock_Sacrifice_Mobs"] = function(t)
     end
 
     UseSurvival()
-    t.AssertEqual(spellCast, "Sacrifice", "Warlock should cast Sacrifice if 3+ mobs on me.")
-
+    t.AssertEqual({ actual = spellCast, expected = "Sacrifice" })
     GetMobDistribution = nil -- Cleanup
 end

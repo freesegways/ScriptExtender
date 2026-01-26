@@ -22,7 +22,7 @@ Utils\NextSpells.test.lua
 Utils\GetTargetPriority.lua
 Utils\TargetSafety.lua
 Utils\TargetValidation.lua
-Utils\CombatLoop.lua
+
 Utils\TalentUtils.lua
 Utils\TalentUtils.test.lua
 Utils\SpellUtils.lua
@@ -53,7 +53,9 @@ Combat\UseSurvival.lua
 Combat\UseSurvival.test.lua
 Combat\SwapWeapons.lua
 Combat\SwapWeapons.test.lua
-Combat\ManaWand.lua
+Combat\AutoCombat\CombatContext.lua
+Combat\AutoCombat\AutoCombat.lua
+Combat\AutoCombat\Generic\ManaWand.lua
 
 Healing\SmartCancel.lua
 Healing\SmartCancel.test.lua
@@ -73,6 +75,13 @@ Classes\Warlock\DeleteExcessShards.lua
 Classes\Warlock\DeleteExcessShards.test.lua
 Classes\Warlock\AutoWarlockBuffs.lua
 Classes\Warlock\AutoWarlockBuffs.test.lua
+Combat\AutoCombat\Classes\Warlock\AutoWarlock.lua
+Combat\AutoCombat\Classes\Warlock\AutoWarlock.test.lua
+
+Combat\AutoCombat\Classes\Warlock\WarlockAnalyze.lua
+Combat\AutoCombat\Classes\Warlock\WarlockAnalyze.test.lua
+Combat\AutoCombat\Classes\Warlock\WarlockPetAnalyze.lua
+Combat\AutoCombat\Classes\Warlock\WarlockPetAnalyze.test.lua
 
 Classes\Druid\AutoDruidBuffs.lua
 
@@ -81,13 +90,4 @@ Classes\Paladin\AutoPaladinBuffs.lua
 Classes\Shaman\AutoShamanBuffs.lua
 Classes\Hunter\AutoHunterBuffs.lua
 
-Classes\Warlock\WarlockAnalyze.lua
-Classes\Warlock\AutoDoT.lua
-Classes\Warlock\PetAnalyze.lua
-Classes\Warlock\AutoPet.lua
-Classes\Warlock\AutoWarlock.lua
-Classes\Warlock\AutoWarlock.test.lua
-Classes\Warlock\WarlockAnalyze.test.lua
-Classes\Warlock\WarlockAnalyze_Group.test.lua
-Classes\Warlock\WarlockAnalyze_Marks.test.lua
 UI\MacroWindow.xml

@@ -8,7 +8,7 @@ ScriptExtender_Tests["GetHealProfile_Filter_Level"] = function(t)
 
     t.Assert(report["Lesser Heal(Rank 1)"], "Should have Rank 1 (Lvl 1)")
     t.Assert(report["Lesser Heal(Rank 3)"], "Should have Rank 3 (Lvl 10)")
-    t.AssertEqual(report["Heal(Rank 1)"], nil, "Should NOT have Heal (Lvl 16)")
+    t.AssertEqual({ actual = report["Heal(Rank 1)"], expected = nil })
 end
 
 ScriptExtender_Tests["GetHealProfile_Calculation"] = function(t)

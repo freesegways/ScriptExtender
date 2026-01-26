@@ -9,7 +9,9 @@ if not ScriptExtender_ScanTooltip then
 end
 
 -- 1. ANALYZER
-function ScriptExtender_ManaWand_Analyze(u, isScanning, tm)
+function ScriptExtender_ManaWand_Analyze(u, forceOOC, ctx)
+    local isScanning = not forceOOC
+
     -- Prerequisites check
     if not UnitExists(u) or UnitIsDead(u) or not UnitCanAttack("player", u) then
         return nil, nil, -1000
@@ -82,7 +84,7 @@ function ManaWand()
         actors.untargetIfNoActionExecuted = true
     end
 
-    ScriptExtender_RunCombatLoop(actors)
+    ScriptExtender_AutoCombat_Run(actors)
 end
 
 ScriptExtender_Register("ManaWand", "Uses CombatLoop to find a target with Judgement of Wisdom and Wand it.")

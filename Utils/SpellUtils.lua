@@ -93,16 +93,26 @@ function ScriptExtender_GetSpellID(spellName)
     end
 
     -- Normalization: Handle "Spell Name(Rank X)" vs "Spell Name (Rank X)"
+    -- Normalization: Handle "Spell Name(Rank X)" vs "Spell Name (Rank X)"
+    -- Also handle user inputs like "Spell Name" (implied any rank) matching "Spell Name" in book.
     local targetBase = spellName
     local targetRank = nil
 
-    local s, e, r = string.find(spellName, "Rank (%d+)")
+    local s, e, r = string.find(spellName, "%(Rank (%d+)%)")
+    -- If using "Spell Name(Rank X)" syntax without space, s is start of "("
+    if not s then
+        -- try search for "(Rank " manually if string.find failed due to escaping?
+        -- No, the pattern "%(Rank (%d+)%)" handles parens.
+        -- Let's try simple match.
+        s, e, r = string.find(spellName, "Rank (%d+)")
+    end
+
     if s then
         targetRank = "Rank " .. r
-        targetBase = string.sub(spellName, 1, s - 2) -- remove " (Rank X"
-        -- Handle space/no-space
-        if string.sub(targetBase, -1) == "(" then targetBase = string.sub(targetBase, 1, -2) end
-        targetBase = string.gsub(targetBase, "%s+$", "") -- trim tail
+        targetBase = string.sub(spellName, 1, s - 1)
+        -- Trim trailing parens or whitespace
+        targetBase = string.gsub(targetBase, "%(", "")
+        targetBase = string.gsub(targetBase, "%s+$", "")
     end
 
     local i = 1
@@ -120,14 +130,6 @@ function ScriptExtender_GetSpellID(spellName)
                 end
             else
                 -- No Rank Requested (Base Name Only)
-                -- We found a rank of it.
-                -- If we want "Best Rank", we should keep looping?
-                -- Usually, GetSpellID is used for Cooldowns (Shared) or presence check.
-                -- Returning the current index is fine.
-                -- However, usually we want the Max Rank for 'CastSpell' usage if we used ID.
-                -- But we use CastSpellByName.
-
-                -- We return this ID.
                 ScriptExtender_SpellUtils.IDCache[spellName] = i
                 return i
             end

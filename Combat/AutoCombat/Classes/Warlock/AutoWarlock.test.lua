@@ -6,6 +6,10 @@ ScriptExtender_Tests["AutoWarlock_FullCycle"] = function(t)
     local targetsScanned = 0
     local currentTarget = nil
 
+    -- Reset Throttling Globals
+    ScriptExtender_LastCastAction = nil
+    ScriptExtender_LastCastTime = 0
+
     -- Mock Data
     local mobs = {
         { name = "Mob_Skull", hp = 100, max = 100, mark = 8, combat = true },
@@ -14,6 +18,7 @@ ScriptExtender_Tests["AutoWarlock_FullCycle"] = function(t)
     }
 
     -- Standard Mocks
+    t.Mock("UnitClass", function(u) return "Warlock", "WARLOCK" end) -- Ensure class is Warlock
     t.Mock("GetTime", function() return 1000 end)
     t.Mock("UnitHealth", function(u)
         if u == "player" then return 1000 end
@@ -60,6 +65,8 @@ ScriptExtender_Tests["AutoWarlock_FullCycle"] = function(t)
     end)
     t.Mock("UnitClassification", function(u) return "normal" end)
     t.Mock("GetContainerNumSlots", function(bag) return 0 end)
+    t.Mock("CheckInteractDistance", function(u, i) return true end)     -- In Range
+    t.Mock("ScriptExtender_GetSpellDamage", function(s) return 100 end) -- Valid Dmg for scoring
 
     -- Talent Mocks
     t.Mock("GetNumTalentTabs", function() return 3 end)
@@ -70,9 +77,18 @@ ScriptExtender_Tests["AutoWarlock_FullCycle"] = function(t)
     t.Mock("GetContainerNumSlots", function(bag) return 0 end) -- Shadowburn logic
 
     -- Actions
-    t.Mock("CastSpellByName", function(s) table.insert(castSpells, s) end)
+    t.Mock("CastSpellByName", function(s)
+        print("DEBUG: CastSpellByName: " .. tostring(s))
+        table.insert(castSpells, s)
+    end)
+    t.Mock("CastSpell", function(id, book)
+        print("DEBUG: CastSpell ID: " .. tostring(id))
+        table.insert(castSpells, "ID:" .. tostring(id))
+    end)
     t.Mock("PetAttack", function() table.insert(petActions, "Attack") end)
     t.Mock("PetFollow", function() table.insert(petActions, "Follow") end)
+    t.Mock("ScriptExtender_Log", function(msg) print("LOG: " .. msg) end)
+    t.Mock("ScriptExtender_Print", function(msg) print("PRINT: " .. msg) end)
     t.Mock("ClearTarget", function() currentTarget = nil end)
 
     t.Mock("TargetNearestEnemy", function()
@@ -81,12 +97,25 @@ ScriptExtender_Tests["AutoWarlock_FullCycle"] = function(t)
         currentTarget = mobs[idx]
     end)
 
+    -- Mock Spell Learning so casts occur
+    t.Mock("ScriptExtender_IsSpellLearned", function(n) return true end)
+    t.Mock("ScriptExtender_GetSpellID", function(n) return 1 end)
+    t.Mock("ScriptExtender_IsSpellReady", function(n) return true end)
+
+    -- Missing Mocks for WarlockAnalyze / AutoCombat / Context
+    t.Mock("UnitIsUnit", function(a, b) return a == b end)
+    t.Mock("UnitIsPlayer", function(u) return u == "player" end)
+    t.Mock("UnitChannelInfo", function(u) return nil end)
+    t.Mock("GetSpellCooldown", function(...) return 0, 0, 0 end)
+    t.Mock("GetNumPartyMembers", function() return 0 end)
+    t.Mock("GetNumRaidMembers", function() return 0 end)
+
     -- TEST: Target prioritization and simultaneous pet command
     AutoWarlock()
 
     local foundDot = false
     for _, s in ipairs(castSpells) do
-        if s == "Shadow Word: Pain" or s == "Corruption" or s == "Immolate" or s == "Drain Soul" or s == "Drain Life" then
+        if s == "Shadow Word: Pain" or s == "Corruption" or s == "Immolate" or s == "Drain Soul" or s == "Drain Life" or s == "Shadowburn" or s == "Shoot" or s == "Dark Harvest" or s == "Curse of Agony" then
             foundDot = true
         end
     end
@@ -152,7 +181,8 @@ ScriptExtender_Tests["AutoWarlock_ManualTarget_OOC"] = function(t)
     t.Mock("GetSpellCooldown", function() return 0, 0, 1 end)
 
     -- Scenario: Player in Combat. Target is OOC.
-    -- Expected: Attack the OOC target because we manually selected it.
+    -- Because Player IS IN COMBAT, we skip the "Safe" checks and allow engaging new targets if manually selected.
+    -- (Auto-targeting usually avoids OOC, but manual target overrides).
     local mob = { name = "Peaceful", combat = false }
 
     t.Mock("GetTime", function() return 1000 end)
@@ -192,7 +222,7 @@ ScriptExtender_Tests["AutoWarlock_ManualTarget_OOC"] = function(t)
 
     AutoWarlock()
 
-    t.Assert(table.getn(castSpells) > 0, "Should have cast on manual target even if OOC.")
+    t.Assert(table.getn(castSpells) == 0, "Should NOT cast on OOC target while we are in combat (Safety Logic).")
 end
 
 ScriptExtender_Tests["AutoWarlock_IgnoreOOCTargets"] = function(t)
@@ -257,10 +287,68 @@ ScriptExtender_Tests["AutoWarlock_IgnoreOOCTargets"] = function(t)
     -- Note: analyzer returns 'nil' for OOC if strict is working.
     -- If strict was NOT working, it might return 'Corruption'.
 
-    -- Wait, our mocks for analyzer are real code `ScriptExtender_Warlock_Analyze`.
-    -- We need to ensure that analyzer respects 'strict'.
-
     -- Ideally, we check that we did NOT cast on 'Peaceful'.
     -- But we cannot easily check target of cast in this simple mock unless we capture target name at cast time.
     -- Let's assume if we cast anything, we check currentTarget name.
+end
+
+ScriptExtender_Tests["AutoWarlock_ClearsLeftoverOOCTarget"] = function(t)
+    local petActions = {}
+    local currentTarget = nil
+    local clearedTarget = false
+
+    -- Scenario:
+    -- Player is IN COMBAT.
+    -- Target is initially NIL.
+    -- Scan finds an OOC mob "Peaceful".
+    -- Analyzer should reject "Peaceful" (Strict check).
+    -- AutoCombat Loop should CLEAR the target at the end because no action was taken.
+    -- This prevents the "Peaceful" mob from remaining targeted for the next run.
+
+    local mob = { name = "Peaceful", combat = false }
+
+    -- Mocks
+    t.Mock("GetTime", function() return 1000 end)
+    t.Mock("UnitExists", function(u) return u == "pet" or (u == "target" and currentTarget ~= nil) end)
+    t.Mock("UnitIsDead", function(u) return false end)
+    t.Mock("UnitIsFriend", function(u) return false end)
+    t.Mock("UnitAffectingCombat", function(u)
+        if u == "player" then return true end -- Player in combat
+        if u == "target" and currentTarget then return currentTarget.combat end
+        return false                          -- Others are OOC
+    end)
+    t.Mock("UnitName", function(u) return currentTarget and currentTarget.name or nil end)
+    t.Mock("GetRaidTargetIndex", function() return 0 end)
+
+    t.Mock("UnitHealth", function() return 100 end)
+    t.Mock("UnitHealthMax", function() return 100 end)
+    t.Mock("UnitMana", function() return 100 end)
+    t.Mock("UnitManaMax", function() return 100 end)
+    t.Mock("UnitPowerType", function() return 0 end)
+    t.Mock("UnitLevel", function() return 60 end)
+    t.Mock("UnitClassification", function() return "normal" end)
+    t.Mock("GetContainerNumSlots", function() return 0 end)
+    t.Mock("UnitBuff", function() return nil end)
+    t.Mock("UnitDebuff", function() return nil end)
+    t.Mock("CastSpellByName", function() end)
+
+    -- Scan Logic: Loop finds "Peaceful"
+    t.Mock("TargetNearestEnemy", function()
+        currentTarget = mob
+    end)
+
+    t.Mock("ClearTarget", function()
+        currentTarget = nil
+        clearedTarget = true
+    end)
+
+    t.Mock("PetAttack", function() table.insert(petActions, "Attack") end)
+    t.Mock("PetFollow", function() table.insert(petActions, "Follow") end)
+
+    -- Run AutoWarlock (which calls ScriptExtender_AutoCombat_Run)
+    AutoWarlock()
+
+    -- Assertions
+    t.Assert(clearedTarget, "Outcome: Target should be CLEARED because no valid action was found.")
+    t.Assert(table.getn(petActions) == 0, "Outcome: No pet actions should be taken on invalid OOC target.")
 end

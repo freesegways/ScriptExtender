@@ -27,7 +27,7 @@ ScriptExtender_Tests["SmartCleanse_Priority_Healer"] = function(t)
     t.Mock("SpellIsTargeting", function() return false end)
 
     SmartCleanse()
-    t.AssertEqual(target, "party1", "Should prioritize Healer over Tank.")
+    t.AssertEqual({ actual = target, expected = "party1" })
 end
 
 -- 2. TANK PRIORITY
@@ -56,7 +56,7 @@ ScriptExtender_Tests["SmartCleanse_Priority_Tank"] = function(t)
     t.Mock("ClearTarget", function() end)
 
     SmartCleanse()
-    t.AssertEqual(target, "party2", "Should prioritize Tank over DPS.")
+    t.AssertEqual({ actual = target, expected = "party2" })
 end
 
 -- 3. RANGE CHECK SKIP
@@ -94,5 +94,5 @@ ScriptExtender_Tests["SmartCleanse_Skip_Range"] = function(t)
     t.Mock("ClearTarget", function() end)
 
     SmartCleanse()
-    t.AssertEqual(target, "party2", "Should skip OOR Healer and cleanse Tank.")
+    t.AssertEqual({ actual = target, expected = "party2" })
 end

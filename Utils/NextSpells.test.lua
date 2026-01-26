@@ -10,6 +10,10 @@ ScriptExtender_Tests["NextSpells_Filtering"] = function(t)
         end
     })
 
+    t.Mock("ScriptExtender_Print", function(msg)
+        table.insert(messages, msg)
+    end)
+
     t.Mock("UnitClass", function(unit) return "Priest", "PRIEST" end)
     t.Mock("UnitLevel", function(unit) return 5 end) -- User is level 5
 
@@ -36,6 +40,12 @@ ScriptExtender_Tests["NextSpells_Filtering"] = function(t)
             return "Lesser Heal", "Rank 2"
         end
         return nil, nil
+    end)
+
+    -- Explicitly Mock ScriptExtender_IsSpellLearned to ensure filtering works regardless of SpellUtils logic
+    t.Mock("ScriptExtender_IsSpellLearned", function(name, class)
+        if name == "Lesser Heal (Rank 2)" then return true end
+        return false
     end)
 
     -- Command registry check

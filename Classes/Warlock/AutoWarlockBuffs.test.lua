@@ -21,9 +21,11 @@ ScriptExtender_Tests["AutoWarlockBuffs_CraftAllRanks"] = function(t)
     knownSpells["Create Healthstone (Greater)"] = 102
     knownSpells["Create Healthstone"] = 103
 
-    ScriptExtender_IsSpellLearned = function(s) return knownSpells[s] ~= nil end
-    ScriptExtender_GetSpellID = function(s) return knownSpells[s] end
-
+    t.Mock("ScriptExtender_IsSpellLearned", function(s) return knownSpells[s] ~= nil end)
+    t.Mock("ScriptExtender_GetSpellID", function(s)
+        if knownSpells[s] then return knownSpells[s] end
+        return nil
+    end)
     t.Mock("CastSpellByName", function(s) table.insert(castSpells, s) end)
     t.Mock("CastSpell", function(id, book) table.insert(castSpells, "ID:" .. id) end)
     t.Mock("ScriptExtender_Print", function(msg) end)
@@ -95,4 +97,62 @@ ScriptExtender_Tests["AutoWarlockBuffs_CraftAllRanks"] = function(t)
         if s == "ID:101" then foundMajor = true end
     end
     t.Assert(not foundMajor, "Should NOT have crafted Major Healthstone (already have it).")
+end
+
+ScriptExtender_Tests["AutoWarlockBuffs_Healthstones"] = function(t)
+    local calledCast = nil
+
+    -- Mocks
+    t.Mock("UnitLevel", function(u) return 60 end)
+    t.Mock("UnitMana", function(u) return 500 end)
+    t.Mock("UnitClass", function(u) return "Warlock", "WARLOCK" end)
+    t.Mock("GetTime", function() return 1000 end)
+    t.Mock("GetPlayerBuff", function() return -1 end)
+
+    -- Mock Spell System
+    t.Mock("ScriptExtender_IsSpellLearned", function(s)
+        if s == "Create Felstone" then return false end -- Disable Felstone for this test
+        return true
+    end)
+    t.Mock("ScriptExtender_GetSpellID", function(s)
+        if s == "Create Healthstone (Major)" then return 10 end
+        return nil
+    end)
+
+    -- Mock Bag (No HS, Has Shard)
+    t.Mock("GetContainerNumSlots", function(b) return 1 end)
+    t.Mock("GetContainerItemLink", function(b, s)
+        if b == 0 and s == 1 then return "|cff9d9d9d|Hitem:6265:0:0:0|h[Soul Shard]|h|r" end
+        return nil
+    end)
+
+    -- Mock Buffs (Simulate Demon Armor AND Unending Breath active)
+    local buffNames = { [100] = "Demon Armor", [101] = "Unending Breath" }
+    local selectedBuff = 0
+
+    t.Mock("GetPlayerBuff", function(i, filter)
+        if i == 0 then return 100 end
+        if i == 1 then return 101 end
+        return -1
+    end)
+    t.Mock("GetPlayerBuffTimeLeft", function(index) return 1800 end)
+
+    -- Mock Tooltip Logic
+    if SE_ScanTooltip then
+        SE_ScanTooltip.SetPlayerBuff = function(self, id) selectedBuff = id end
+        SE_ScanTooltip.ClearLines = function() end
+    end
+    SE_ScanTooltipTextLeft1 = {
+        GetText = function() return buffNames[selectedBuff] end
+    }
+
+    t.Mock("CastSpell", function(id, book)
+        if id == 10 then calledCast = "Create Healthstone (Major)" end
+    end)
+    t.Mock("CastSpellByName", function(s) calledCast = s end)
+    t.Mock("ScriptExtender_Log", function(msg) end)
+
+    AutoWarlockBuffs(5)
+
+    t.AssertEqual({ actual = calledCast, expected = "Create Healthstone (Major)" })
 end

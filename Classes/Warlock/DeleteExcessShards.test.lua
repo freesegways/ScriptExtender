@@ -30,5 +30,5 @@ ScriptExtender_Tests["DeleteExcessShards_Check"] = function(t)
 
     DeleteExcessShards(2)
 
-    t.AssertEqual(deletedCount, 2, "Should delete exactly 2 excess shards.")
+    t.AssertEqual({ actual = deletedCount, expected = 2 })
 end
