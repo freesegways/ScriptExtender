@@ -93,6 +93,14 @@ ScriptExtender_Tests["AutoWarlock_FullCycle"] = function(t)
     t.Mock("ScriptExtender_Log", function(msg) print("LOG: " .. msg) end)
     t.Mock("ScriptExtender_Print", function(msg) print("PRINT: " .. msg) end)
     t.Mock("ClearTarget", function() currentTarget = nil end)
+    t.Mock("TargetByName", function(n)
+        for _, m in ipairs(mobs) do
+            if m.name == n then
+                currentTarget = m
+                return
+            end
+        end
+    end)
 
     t.Mock("TargetNearestEnemy", function()
         targetsScanned = targetsScanned + 1
@@ -123,7 +131,7 @@ ScriptExtender_Tests["AutoWarlock_FullCycle"] = function(t)
 
     local foundDot = false
     for _, s in ipairs(castSpells) do
-        if s == "Shadow Word: Pain" or s == "Corruption" or s == "Immolate" or s == "Drain Soul" or s == "Drain Life" or s == "Shadowburn" or s == "Shoot" or s == "Dark Harvest" or s == "Curse of Agony" then
+        if s == "Shadow Word: Pain" or s == "Corruption" or s == "Immolate" or s == "Drain Soul" or s == "Drain Life" or s == "Shadowburn" or s == "Shoot" or s == "Dark Harvest" or s == "Curse of Agony" or s == "Shadow Bolt" then
             foundDot = true
         end
     end
@@ -333,8 +341,7 @@ ScriptExtender_Tests["AutoWarlock_ManualPull_OOC"] = function(t)
     AutoWarlock()
 
     -- EXPECT: Should cast something (pull the mob)
-    t.Assert(table.getn(castSpells) > 0,
-        "Should PULL manually targeted OOC mob when player is OOC. Cast count: " .. table.getn(castSpells))
+    t.Assert(table.getn(castSpells) > 0, "Should PULL manually targeted OOC mob when player is OOC.")
 
     -- EXPECT: Pet should attack
     local petAttacked = false

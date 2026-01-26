@@ -21,22 +21,6 @@ function ScriptExtender_GetPseudoID(unit)
     local _, cl = UnitClass(unit)
     cl = cl or "none"
 
-    -- Debuff Signature: Capture the first few debuffs to distinguish state
-    -- (e.g. Boar A has Corruption, Boar B does not -> Different IDs)
-    local dSig = ""
-    for i = 1, 5 do
-        local d = UnitDebuff(unit, i)
-        if d then
-            -- Use the file name part of texture as a short hash
-            -- texture path: "Interface\\Icons\\Spell_Shadow_Abomination"
-            local _, _, textureName = string.find(d, "([^\\]+)$")
-            if not textureName then textureName = d end
-            dSig = dSig .. "|" .. textureName
-        else
-            break
-        end
-    end
-
-    -- Format: Name_Lvl_MaxHP_Sex_Class_Family_UnitClass_Debuffs
-    return string.format("%s_%d_%d_%d_%s_%s_%s%s", n, l, mh, s, c, f, cl, dSig)
+    -- Format: Name_Lvl_MaxHP_Sex_Class_Family_UnitClass
+    return string.format("%s_%d_%d_%d_%s_%s_%s", n, l, mh, s, c, f, cl)
 end

@@ -35,7 +35,7 @@ function ScriptExtender_Register(name, help)
 end
 
 function ScriptExtender_Log(msg)
-    -- print("[LOG] " .. msg)
+    print("[LOG] " .. msg)
 end
 
 function ScriptExtender_Print(msg)

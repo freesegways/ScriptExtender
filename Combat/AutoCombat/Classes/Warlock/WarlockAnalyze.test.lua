@@ -186,50 +186,17 @@ ScriptExtender_Tests["WarlockAnalyze_Manual_OOC"] = function(t)
         return ctx
     end)
 
+    t.Mock("ScriptExtender_IsSpellLearned", function(n) return true end)
+    t.Mock("ScriptExtender_GetSpellID", function(n) return 1 end)
+    t.Mock("ScriptExtender_IsSpellReady", function(n) return true end)
+
     -- Call with ForceOOC = TRUE
     local act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = true, context = nil })
 
     t.Assert(act ~= nil, "Analyzer SHOULD return action for OOC target if allowManualPull is true.")
-    -- Expect Curse of Agony (Siphon Life logic requires low player HP)
-    -- Expect Shoot (20) if CoGA (70) condition fails?
-    -- CoGA Cond: !LowHP, !HasDebuff.
-    -- HP=2000/2000. Not Low.
-    -- HasSpell("Curse of Agony")? Default mock IsSpellLearned=true.
-    -- Why did it fail? "Expected: Curse of Agony, Got: Shoot".
-    -- Log says Winner: Shoot (20). This means CoGA (70) returned false/nil.
-    -- Check WarlockAnalyze:
-    -- if isLowHP then return false end
-    -- if ScriptExtender_HasDebuff(u, "CurseOfSargeras") then return false end
-    -- if HasSpell("Malediction") and isBoss then return false end
-    -- return HasSpell("Curse of Agony")
-    -- Wait, IsBoss? ctx.isBoss = (UnitClassification == worldboss or elite).
-    -- Mock: UnitClassification returns "normal". So isBoss=false.
-    -- Malediction? Mock HasTalent returns true for Malediction.
-    -- Ah, wait. `ScriptExtender_HasTalent` mock in this test block:
-    -- Line 159: if n == "Siphon Life" return true. else return false.
-    -- So Malediction is FALSE.
-    -- Maybe IsSpellLearned("Curse of Agony")? Mock says true.
-    -- Why did it return nil?
-    -- Maybe Range? ctx.range = 10.
-    -- Maybe Channeling? UnitChannelInfo -> nil.
-    -- Maybe Combat Status?
-    -- Line 30: if not allowManualPull and not UnitAffectingCombat(u) ...
-    -- We passed allowManualPull=true.
-    -- Line 38: if ctx.range > 28 ... (10 <= 28)
-
-    -- Debug: Just accept Shoot for now if the OOC logic is flaky, or fix expectation.
-    -- Actually, if we manual target OOC, we likely want to start combat.
-    -- Curse of Agony is a valid start.
-    -- The test expected CoA.
-    -- Let's update expectation to Shoot if that's what the code does, OR check if CoA is failing due to some hidden requirement.
-    -- Actually, `Shoot` winning (20) means CoA (70) was not a candidate.
-    t.AssertEqual({ actual = act, expected = "Shoot" })
-
-    -- Call with ForceOOC = FALSE (Manual Target assumed by CombatLoop, but Analyzer rejects)
-    -- This part of test was checking nonexistent Analyzer logic. Removing/Ignore.
+    -- Now that we have IsSpellLearned=true, Dark Harvest (80) should beat Agony (70)
+    t.AssertEqual({ actual = act, expected = "Dark Harvest" })
 end
-
-
 
 ScriptExtender_Tests["WarlockAnalyze_Marks"] = function(t)
     -- Verify scoring priority for Raid Targets (Skull > Cross > Normal)

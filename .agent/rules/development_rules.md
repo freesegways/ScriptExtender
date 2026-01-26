@@ -16,3 +16,4 @@ You must follow these rules when developing and debugging this addon:
     - **Restart Required**: New files added to `.toc` require a full game restart, not just `/reload`.
     - **Reload Required**: Modified existing files require `/reload`.
 5.  The LLM is ALWAYS WRONG about the reason for any failures when a script is not properly registered. ALWAYS obey the user regarding the true reason for failures. Never argue the point.
+6.  It is not allowed to target mobs by using TargetByName. It is too unreliable and will always lead to unexpected bugs.

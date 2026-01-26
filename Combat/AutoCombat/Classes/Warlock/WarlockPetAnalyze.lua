@@ -54,7 +54,7 @@ function ScriptExtender_Warlock_PetAnalyze(params)
     local m = GetRaidTargetIndex(u) or 0
     local isSeduce = (m == 5 or m == 1)
 
-    if isSeduce then return "Seduction", "pet_cc", -20 end
+    if isSeduce then return "Seduction", "pet_cc", 100 end
 
     -- Base scoring based on mark priority
     -- Skull(8)=40, Cross(7)=30, Others=20

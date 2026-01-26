@@ -177,11 +177,10 @@ function ScriptExtender_Warlock_Analyze(params)
             if ScriptExtender_HasBuff("player", "Spell_Shadow_Twilight") then return 100 end
 
             -- Standard Cast
-            if myMana > 15 then return true end
+            if myMana > 15 and HasSpell("Shadow Bolt") then return true end
             return false
         end,
         scoreMod = function(s)
-            if s == 100 then return s end -- Proc priority
             return s
         end
     })
@@ -192,7 +191,7 @@ function ScriptExtender_Warlock_Analyze(params)
         type = "fill",
         base = 20,
         cond = function()
-            return true -- Always valid
+            return HasSpell("Shoot") -- Check if wand equipped/learned
         end
     })
 
@@ -213,8 +212,9 @@ function ScriptExtender_Warlock_Analyze(params)
     local bestName, bestType, bestScore = nil, nil, -1
 
     for _, c in ipairs(candidates) do
-        if c.cond() then
-            local s = c.base
+        local condRes = c.cond()
+        if condRes then
+            local s = (type(condRes) == "number") and condRes or c.base
             if c.scoreMod then s = c.scoreMod(s) end
 
             if s > bestScore then

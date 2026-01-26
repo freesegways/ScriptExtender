@@ -64,7 +64,7 @@ function ScriptExtender_AutoCombat_Run(actors)
             end
 
             if match then
-                -- If manual target is IN COMBAT, we allow scan to proceed (Check for better targets like Healers)
+                -- If manual target is IN COMBAT,
                 -- (OOC case covered above)
                 local targetInCombat = UnitAffectingCombat("target")
                 if not targetInCombat then
@@ -90,7 +90,6 @@ function ScriptExtender_AutoCombat_Run(actors)
             if valid then
                 -- Get Context for Scanned Unit (Lightweight enrichment)
                 local ctx = ScriptExtender_EnrichContext(globalCtx, u, true)
-
                 for idx, actor in ipairs(actors) do
                     -- Pass allowManualPull=FALSE (Strict) to prevent auto-pulling OOC mobs
                     local action, type, score = actor.analyzer({ unit = u, allowManualPull = false, context = ctx })
@@ -116,6 +115,14 @@ function ScriptExtender_AutoCombat_Run(actors)
                             }
                         end
                     end
+                end
+
+                -- BRAKE: If we found a "Kill" target on this unit, STOP scanning.
+                -- This ensures we are currently targeting the best mob when the loop ends.
+                local topScore = -1000
+                for _, b in ipairs(best) do if b.score > topScore then topScore = b.score end end
+                if topScore >= 90 then
+                    break
                 end
             end
         end
@@ -144,14 +151,6 @@ function ScriptExtender_AutoCombat_Run(actors)
             else
                 manualActionExists = true
             end
-        end
-    end
-
-    -- Only auto-target if we have ONLY auto-scan actions and no valid combat target.
-    -- If we have a manual action, we NEVER want to change our target.
-    if anyNeedsAutoTarget and not manualActionExists then
-        if not (UnitExists("target") and UnitAffectingCombat("target") and not UnitIsDead("target") and not UnitIsFriend(P, "target")) then
-            TargetNearestEnemy()
         end
     end
 
