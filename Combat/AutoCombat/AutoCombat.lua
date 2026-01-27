@@ -1,9 +1,35 @@
 -- Combat/AutCombat/AutoCombat.lua
 -- A reusable targeting loop that can run multiple analyzers (e.g. Player and Pet) in a single pass.
 
-function ScriptExtender_AutoCombat_Run(actors)
-    -- actors: Array of { analyzer = function, onExecute = function }
-    if not actors then return end
+function ScriptExtender_AutoCombat_Run(params)
+    -- params: {
+    --   actors = Array of { analyzer = function, onExecute = function }
+    --   disableScan = (optional) boolean to skip auto-scan phase
+    -- }
+
+    local actors = params.actors
+    local disableScan = params.disableScan
+
+    if not actors or type(actors) ~= "table" then
+        error("ERROR: ScriptExtender_AutoCombat_Run: params.actors must be a table")
+        return
+    end
+
+
+    for i, actor in ipairs(actors) do
+        if type(actor) ~= "table" then
+            error("ERROR: ScriptExtender_AutoCombat_Run: actor[" .. i .. "] must be a table")
+            return
+        end
+        if type(actor.analyzer) ~= "function" then
+            error("ERROR: ScriptExtender_AutoCombat_Run: actor[" .. i .. "].analyzer must be a function")
+            return
+        end
+        if type(actor.onExecute) ~= "function" then
+            error("ERROR: ScriptExtender_AutoCombat_Run: actor[" .. i .. "].onExecute must be a function")
+            return
+        end
+    end
 
     local tm = GetTime()
     local best = {}
@@ -75,7 +101,7 @@ function ScriptExtender_AutoCombat_Run(actors)
         end
     end
 
-    if not actors.disableScan and not manualOverride then
+    if not disableScan and not manualOverride then
         -- OPTIMIZATION: Fetch Global Context ONCE (skipScan=true for speed)
         local globalCtx = ScriptExtender_GetGlobalContext(true)
 
@@ -158,27 +184,57 @@ function ScriptExtender_AutoCombat_Run(actors)
     for idx, actor in ipairs(actors) do
         local b = best[idx]
         if b.action and b.score > -100 then
+            ScriptExtender_Log("[EXEC] Attempting to execute " .. b.action .. " on " .. tostring(b.targetName))
+
             -- Validate current target
             if UnitExists("target") and not UnitIsDead("target") and not UnitIsFriend(P, "target") then
-                -- Match check: Ensure we are still targeting who we analyzed
-                -- (Skip for strict/auto-scan as they might have been targeted by Phase 2 auto-target)
-                if b.strict or ScriptExtender_IsTargetMatch(b, "target") then
-                    -- Requirement: Auto-scanned targets MUST be in combat. Manual targets can be OOC (Pulling).
-                    local combatPass = not b.strict or UnitAffectingCombat("target")
+                ScriptExtender_Log("[EXEC] Target validation PASSED")
 
-                    if combatPass then
-                        -- Final Identity Check before casting:
-                        -- If we have a PseudoID, verify it matches the current target.
-                        -- This prevents casting on a mob with the same name but different state (e.g. Swapped Boars).
-                        if b.targetPseudoID and b.targetPseudoID ~= ScriptExtender_GetPseudoID("target") then
-                            -- Mismatch! We likely tabbed to a different mob with same name. Abort.
-                            ScriptExtender_Log("PseudoID Mismatch. Aborting cast.")
-                        else
-                            actor.onExecute(b.action, b.targetName, tm)
-                            anyActionExecuted = true
+                -- Final Identity Check before casting:
+                -- If we have a PseudoID, verify it matches the current target.
+                -- This prevents casting on a mob with the same name but different state (e.g. Swapped Boars).
+                if b.targetPseudoID and b.targetPseudoID ~= ScriptExtender_GetPseudoID("target") then
+                    -- Mismatch! Try to re-target the correct mob.
+                    ScriptExtender_Log("PseudoID Mismatch. Attempting to re-target correct mob...")
+
+                    local foundCorrectTarget = false
+
+                    -- Scan up to 20 nearby enemies to find the one with matching PseudoID
+                    for i = 1, 20 do
+                        TargetNearestEnemy()
+                        if UnitExists("target") and not UnitIsDead("target") and not UnitIsFriend(P, "target") and UnitAffectingCombat("target") then
+                            local currentPseudoID = ScriptExtender_GetPseudoID("target")
+                            if currentPseudoID == b.targetPseudoID then
+                                -- Found it! Verify name match
+                                local targetName = UnitName("target")
+                                if targetName == b.targetName then
+                                    ScriptExtender_Log("Re-target SUCCESS: Found " .. targetName)
+                                    foundCorrectTarget = true
+                                    -- Execute the action on the correct target
+                                    actor.onExecute(b.action, b.targetName, tm)
+                                    anyActionExecuted = true
+                                    break
+                                end
+                            end
                         end
                     end
+
+                    if not foundCorrectTarget then
+                        error("ERROR: Re-target FAILED: Could not find mob with PseudoID " ..
+                            tostring(b.targetPseudoID))
+                    end
+                else
+                    ScriptExtender_Log("[EXEC] PseudoID match confirmed. Executing action.")
+                    actor.onExecute(b.action, b.targetName, tm)
+                    anyActionExecuted = true
                 end
+            else
+                error("ERROR: Target validation FAILED: Could not find mob with PseudoID " ..
+                    tostring(b.targetPseudoID))
+            end
+        else
+            if b.action then
+                ScriptExtender_Log("[EXEC] Skipping action " .. b.action .. " due to low score (" .. b.score .. ")")
             end
         end
     end
@@ -204,3 +260,5 @@ function ScriptExtender_IsTargetMatch(b, unit)
     end
     return false
 end
+
+if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage("AutoCombat.lua LOADED") end

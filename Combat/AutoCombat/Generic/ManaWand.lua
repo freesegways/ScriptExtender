@@ -80,13 +80,16 @@ function ManaWand()
 
     -- DISABLE SCANNING IF WE ALREADY HAVE A TARGET
     if UnitExists("target") and not UnitIsDead("target") and UnitCanAttack("player", "target") then
-        actors.disableScan = true
+        disableScan = true
     else
         -- If we are scanning (because we have no target), we want to CLEAR target if we find nothing.
         actors.untargetIfNoActionExecuted = true
     end
 
-    ScriptExtender_AutoCombat_Run(actors)
+    ScriptExtender_AutoCombat_Run({
+        actors = actors,
+        disableScan = disableScan
+    })
 end
 
 ScriptExtender_Register("ManaWand", "Uses CombatLoop to find a target with Judgement of Wisdom and Wand it.")
