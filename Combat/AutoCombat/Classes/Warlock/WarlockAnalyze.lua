@@ -9,6 +9,13 @@ local function HasSpell(name)
     return ScriptExtender_IsSpellLearned(name)
 end
 
+
+function ScriptExtender_Warlock_UpdateTracker(s, n, tm)
+    if ScriptExtender_TrackDebuff then
+        ScriptExtender_TrackDebuff(n, s, tm)
+    end
+end
+
 function ScriptExtender_Warlock_Analyze(params)
     local u = params.unit
     local allowManualPull = params.allowManualPull
@@ -27,26 +34,11 @@ function ScriptExtender_Warlock_Analyze(params)
     end
 
     -- Combat Status Enforcer (Unless Manual Target)
-    -- Context doesn't strictly track if *this specific unit* is in combat in the generic block,
-    -- but usually we check UnitAffectingCombat(u).
-    -- Let's stick to raw check for safety or ensure Context has it.
-    -- Context has `inCombat` (player).
-    -- Context does NOT have 'targetInCombat' explicitly in my previous write, let's check.
-    -- I wrote: `ctx.inCombat = UnitAffectingCombat("player")`.
-    -- I did NOT write target combat status. I should fix that or keep raw check.
-    -- keeping raw check for now for safety.
     if not allowManualPull and not UnitAffectingCombat(u) and u ~= "target" then
         return nil, nil, -1000
     end
 
     -- Range Check Use Context
-    -- Warlock wants ~30-36y.
-    -- Context has buckets for 10, 28, and refined estimates for 30/36 via Action slots.
-
-    -- STRICT RANGE: Even for Manual Pull, to avoid casting on out-of-range mobs
-    -- We allow up to 36y (Talented Range).
-    -- If ctx.range is 100, it means > 28y AND > 30y/36y (if action slots checked).
-    -- EXCEPTION: If Manual Pull, we allow it (User takes responsibility for range).
     if not allowManualPull and ctx.range > 36 then
         return nil, nil, -1000
     end
@@ -74,6 +66,24 @@ function ScriptExtender_Warlock_Analyze(params)
 
     local isBoss = ctx.isBoss
     local isLowHP = (hpPct < 25)
+
+    -- Debuff Helper
+    local function HasDebuff(spell)
+        -- Check Tracker via Context (Preferred)
+        if ctx.trackedDebuffs and ctx.trackedDebuffs[spell] then return true end
+
+        -- Fallback to Global Tracker (Safety)
+        if ScriptExtender_IsDebuffTracked and ctx.pseudoID then
+            if ScriptExtender_IsDebuffTracked(ctx.pseudoID, spell) then return true end
+        end
+
+        -- Fallback to visible texture scanning (if implemented via mapping)
+        if spell == "Curse of Agony" and ScriptExtender_HasDebuff(u, "CurseOfSargeras") then return true end
+        if spell == "Corruption" and ScriptExtender_HasDebuff(u, "Abomination") then return true end
+        if spell == "Immolate" and ScriptExtender_HasDebuff(u, "Immolation") then return true end
+
+        return false
+    end
 
     -- === CANDIDATE ACTIONS ===
     local candidates = {}
@@ -107,7 +117,7 @@ function ScriptExtender_Warlock_Analyze(params)
         end
     })
 
-    -- 3. DARK HARVEST (Burst)
+    -- 3. DARK HARVEST (Burst - Requires DoTs)
     table.insert(candidates, {
         name = "Dark Harvest",
         type = "damage",
@@ -115,6 +125,15 @@ function ScriptExtender_Warlock_Analyze(params)
         cond = function()
             -- Use on healthy mobs (Time to tick)
             if isLowHP then return false end
+
+            -- REQUIRE DOTS: Do not cast unless we have at least one DoT ticking.
+            local dots = 0
+            if HasDebuff("Curse of Agony") then dots = dots + 1 end
+            if HasDebuff("Corruption") then dots = dots + 1 end
+            if HasDebuff("Immolate") then dots = dots + 1 end
+
+            if dots == 0 then return false end
+
             return HasSpell("Dark Harvest") and ScriptExtender_IsSpellReady("Dark Harvest")
         end
     })
@@ -127,7 +146,7 @@ function ScriptExtender_Warlock_Analyze(params)
         cond = function()
             if isLowHP then return false end
             -- Check for Agony (Sargeras) OR Elements (ChillTouch/Malediction)
-            if ScriptExtender_HasDebuff(u, "CurseOfSargeras") then return false end
+            if HasDebuff("Curse of Agony") then return false end
             if ScriptExtender_HasDebuff(u, "ChillTouch") then return false end -- Detection for Elements??
             -- Also check Name if texture fails
             if ScriptExtender_HasDebuff(u, "Curse of the Elements") then return false end
@@ -149,19 +168,33 @@ function ScriptExtender_Warlock_Analyze(params)
         end
     })
 
-    -- 5. CORRUPTION (DoT)
+    -- 5. IMMOLATE (DoT/Cast)
+    table.insert(candidates, {
+        name = "Immolate",
+        type = "dot",
+        base = 65, -- Lower than Agony (70), Higher than Corruption (60)
+        cond = function()
+            if isLowHP then return false end
+            if HasDebuff("Immolate") then return false end
+
+            -- If we have Emberstorm or just good mana, use it
+            return HasSpell("Immolate")
+        end
+    })
+
+    -- 6. CORRUPTION (DoT)
     table.insert(candidates, {
         name = "Corruption",
         type = "dot",
         base = 60,
         cond = function()
             if isLowHP then return false end
-            if ScriptExtender_HasDebuff(u, "Abomination") then return false end
+            if HasDebuff("Corruption") then return false end
             return HasSpell("Corruption")
         end
     })
 
-    -- 6. SHADOW BOLT (Nightfall / Filler)
+    -- 7. SHADOW BOLT (Nightfall / Filler)
     table.insert(candidates, {
         name = "Shadow Bolt",
         type = "fill",
@@ -179,7 +212,7 @@ function ScriptExtender_Warlock_Analyze(params)
         end
     })
 
-    -- 7. SHOOT (Filler)
+    -- 8. SHOOT (Filler)
     table.insert(candidates, {
         name = "Shoot",
         type = "fill",
@@ -189,7 +222,7 @@ function ScriptExtender_Warlock_Analyze(params)
         end
     })
 
-    -- 8. LIFE TAP (Resource)
+    -- 9. LIFE TAP (Resource)
     table.insert(candidates, {
         name = "Life Tap",
         type = "self",
@@ -220,8 +253,4 @@ function ScriptExtender_Warlock_Analyze(params)
     end
 
     return bestName, bestType, bestScore
-end
-
-function ScriptExtender_Warlock_UpdateTracker(s, n, tm)
-    -- Stub
 end

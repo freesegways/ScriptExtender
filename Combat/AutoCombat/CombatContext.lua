@@ -163,11 +163,36 @@ function ScriptExtender_EnrichContext(globalCtx, unit, skipScan)
             end
         end
 
+
         -- Pseudo ID for stable identification
         if ScriptExtender_GetPseudoID then
             ctx.pseudoID = ScriptExtender_GetPseudoID(unit)
         else
             ctx.pseudoID = UnitName(unit) -- Fallback
+        end
+
+
+        -- Debuff Tracking (From Tracker Module)
+        ctx.trackedDebuffs = {}
+        if ScriptExtender_IsDebuffTracked then
+            -- Pre-fetch common Warlock debuffs or expose a checker?
+            -- It's better to expose a helper on the context or just allow the analyzer to check.
+            -- But the user asked for context to have it.
+            -- Let's populate a table of active tracked debuffs for this unit.
+            -- Using a known list for now to populate 'ctx.trackedDebuffs' map.
+            local potentialDebuffs = {
+                "Curse of Agony", "Corruption", "Immolate", "Siphon Life",
+                "Curse of the Elements", "Curse of Shadow", "Curse of Recklessness",
+                "Curse of Tongues", "Curse of Weakness", "Fear", "Howl of Terror",
+                "Banish", "Dark Harvest"
+            }
+            -- Use PseudoID for stable tracking
+            local pid = ctx.pseudoID
+            for _, spell in ipairs(potentialDebuffs) do
+                if pid and ScriptExtender_IsDebuffTracked(pid, spell) then
+                    ctx.trackedDebuffs[spell] = true
+                end
+            end
         end
     end
 

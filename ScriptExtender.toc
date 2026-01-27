@@ -57,6 +57,7 @@ Combat\SwapWeapons.test.lua
 Combat\AutoCombat\CombatContext.lua
 Combat\AutoCombat\AutoCombat.lua
 Combat\AutoCombat\Generic\ManaWand.lua
+Combat\AutoCombat\Helpers\DebuffTracker.lua
 
 Healing\SmartCancel.lua
 Healing\SmartCancel.test.lua

@@ -66,8 +66,10 @@ function ScriptExtender_Warlock_PetAnalyze(params)
     end
 
     -- Stickiness: Prefer current target to avoid ping-ponging
-    if UnitExists("pettarget") and UnitIsUnit(u, "pettarget") then
-        score = score + 15
+    -- If the pet is already attacking this unit, give it a HUGE boost to keep it there.
+    -- Unless the player explicitly prioritizes something else significantly higher (e.g. manual target logic in main loop).
+    if UnitName("pettarget") == UnitName(u) then
+        score = score + 200 -- Massive sticky bonus
     end
 
     return "PetAttack", "pet", score

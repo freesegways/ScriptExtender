@@ -193,9 +193,11 @@ ScriptExtender_Tests["WarlockAnalyze_Manual_OOC"] = function(t)
     -- Call with ForceOOC = TRUE
     local act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = true, context = nil })
 
-    t.Assert(act ~= nil, "Analyzer SHOULD return action for OOC target if allowManualPull is true.")
     -- Now that we have IsSpellLearned=true, Dark Harvest (80) should beat Agony (70)
-    t.AssertEqual({ actual = act, expected = "Dark Harvest" })
+    -- BUT Wait: DH Logic requires DoTs > 0.
+    -- Here (OOC) debuffs are empty. So DoTs=0. So DH=False.
+    -- Next best: Curse of the Elements (75) (Since Malediction mocked true via IsSpellLearned).
+    t.AssertEqual({ actual = act, expected = "Curse of the Elements" })
 end
 
 ScriptExtender_Tests["WarlockAnalyze_Marks"] = function(t)
@@ -541,18 +543,6 @@ ScriptExtender_Tests["WarlockAnalyze_DarkHarvest"] = function(t)
     currentMob.hp = 2000 -- Healthy again
 
     act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
-    -- Should probably be Filler (Shadow Bolt/Drain or whatever logic is)
-    -- Wait, if DoTs are up (WD_Track), loops finish.
-    -- DH block skipped (dpsMultiplier > 1).
-    -- Falls to Filler (Drain Soul / Drain Life).
-    -- Log said Winner: Dark Harvest.
-    -- Test expected NOT Dark Harvest.
-    -- Why DH?
-    -- Raid Members=10.
-    -- WarlockAnalyze doesn't check Raid Members! It checks `isBoss` or `isLowHP`.
-    -- If it's a generic raid mob, DH is valid (80).
-    -- So the test expectation was wrong about "Raid Mode" disabling DH. The code doesn't implement that.
-    -- We should expect DH.
     t.AssertEqual({ actual = act, expected = "Dark Harvest" })
 
     -- BUT if Target is Boss...
@@ -560,15 +550,123 @@ ScriptExtender_Tests["WarlockAnalyze_DarkHarvest"] = function(t)
     currentMob.hp = 20000 -- Healthy (Above Dying Threshold of ~6750)
     currentMob.hpMax = 100000
     act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false, context = nil })
-    -- Mid-Combat DH enabled for Boss even in raid? (My logic said 'isBoss')
-    -- Shadowburn (95) > DH (80).
-    -- Bosses usually have high HP, so Shadowburn (Execute) shouldn't trigger unless Low HP.
-    -- CurrentHP = 20000. Max=100000. 20%. IsLowHP = (Pct < 25) -> TRUE.
-    -- So Shadowburn is valid. And beats DH.
-    -- Expect Shadowburn.
     t.AssertEqual({ actual = act, expected = "Shadowburn" })
+
 
     -- Reset
     t.Mock("GetNumRaidMembers", function() return 0 end)
     currentMob.classification = "normal"
+end
+
+ScriptExtender_Tests["WarlockAnalyze_Optimization"] = function(t)
+    -- Verify User Requests:
+    -- 1. Dark Harvest only if DoTs are up.
+    -- 2. Cast Immolate.
+
+    local currentMob = { name = "Target", hp = 2000, hpMax = 2000, debuffs = {} }
+
+    -- Mocks
+    t.Mock("UnitLevel", function(u) return 60 end)
+    t.Mock("UnitHealth", function(u) return currentMob.hp end)
+    t.Mock("UnitHealthMax", function(u) return currentMob.hpMax end)
+    t.Mock("UnitName", function(u) return currentMob.name end)
+    t.Mock("GetTime", function() return 1000 end)
+    t.Mock("UnitExists", function(u) return true end)
+    t.Mock("UnitIsDead", function(u) return false end)
+    t.Mock("UnitIsFriend", function(u) return false end)
+    t.Mock("UnitAffectingCombat", function(u) return true end)
+    -- Debuff Mock
+    t.Mock("UnitDebuff", function(u, i) return currentMob.debuffs[i] end)
+    t.Mock("ScriptExtender_HasDebuff", function(u, name)
+        -- Simplified debuff check for test
+        for _, d in pairs(currentMob.debuffs) do
+            if d == name then return true end
+        end
+        return false
+    end)
+    -- Spells
+    t.Mock("ScriptExtender_IsSpellLearned", function(n) return true end)
+    t.Mock("ScriptExtender_HasTalent", function(n) return true end)
+    t.Mock("ScriptExtender_IsSpellReady", function(n) return true end)
+    t.Mock("GetSpellCooldown", function() return 0, 0, 0 end)
+    t.Mock("ScriptExtender_GetSpellDamage", function() return 100 end)
+
+    -- Mock State
+    local activeDebuffs = {}
+
+    -- Context
+    t.Mock("ScriptExtender_GetCombatContext", function(u)
+        return {
+            targetHP = currentMob.hp,
+            targetMaxHP = currentMob.hpMax,
+            targetHPPct = 100,
+            playerManaPct = 100,
+            playerHPPct = 100,
+            range = 20,
+            pseudoID = u,                  -- Simulating PseudoID
+            trackedDebuffs = activeDebuffs -- Linked to local state
+        }
+    end)
+
+    -- Global Tracker Mock (for fallback if needed, but ctx is preferred)
+    t.Mock("ScriptExtender_IsDebuffTracked", function(pid, spell)
+        if activeDebuffs[spell] then return true end
+        return false
+    end)
+
+    -- 1. FRESH TARGET
+    -- No DoTs. Should NOT cast Dark Harvest.
+    -- Should cast prioritized DoT. Immolate should be in the mix now.
+    -- Let's assume Order: Agony(70) > Immolate(65) > Corruption(60).
+    -- Or Immolate > Agony.
+    -- Regardless, DH (80) should NOT be chosen because no DoTs.
+
+    local act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false })
+
+    t.Assert(act ~= "Dark Harvest", "Should NOT cast Dark Harvest without DoTs. Got: " .. tostring(act))
+    t.Assert(act == "Curse of Agony" or act == "Immolate" or act == "Curse of the Elements",
+        "Should start with DoTs/Curse. Got: " .. tostring(act))
+
+    -- 2. IMMOLATE CHECK
+    -- Assuming we applied Agony.
+    activeDebuffs = {}
+    activeDebuffs["Curse of Agony"] = true
+
+    -- First run calls GetCombatContext again, so we need to ensure the mock captures the REFERENCE to activeDebuffs or we assume GetCombatContext is called each time.
+    -- Since the mock is defined once returning 'activeDebuffs', modifying 'activeDebuffs' works if it's the SAME table.
+    -- However, I just re-assigned activeDebuffs = {}, which creates a NEW table. The mock holds the OLD one.
+    -- better to clear it.
+    for k in pairs(activeDebuffs) do activeDebuffs[k] = nil end
+    activeDebuffs["Curse of Agony"] = true
+
+    -- Wait, the Mock function "ScriptExtender_GetCombatContext" captures the 'activeDebuffs' variable (closure).
+    -- If I reassign 'activeDebuffs = {}', the local variable updates, but the CLOSURE might still point to the OLD one if it was an upvalue?
+    -- Lua closures capture variables by reference (upvalues). So if I update the local variable, the closure sees the new value?
+    -- Yes, in Lua 5.0+ upvalues are shared.
+
+    -- Next should be Immolate (65) or Corruption (60).
+    -- WAIT: If we have Agony, dots=1. DH (80) becomes valid.
+    -- DH (80) > Immolate (65).
+    -- Since we removed the specific Immolate Priority Check inside DH, DH wins.
+    -- User requested NOT to couple Immolate check inside DH.
+    -- So we expect DH.
+    act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false })
+    t.AssertEqual({ actual = act, expected = "Dark Harvest" })
+
+    -- 3. DARK HARVEST WITH DOTS
+    -- Add Immolate and Corruption to tracker.
+    activeDebuffs["Immolate"] = true
+    activeDebuffs["Corruption"] = true
+
+    -- Now we have Agony, Immolate, Corruption.
+    -- DH should now be valid and High Priority (80+).
+    act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false })
+    t.AssertEqual({ actual = act, expected = "Dark Harvest" })
+
+    -- 4. DARK HARVEST WITHOUT DOTS
+    -- Reset tracker
+    for k in pairs(activeDebuffs) do activeDebuffs[k] = nil end
+
+    act, type, score = ScriptExtender_Warlock_Analyze({ unit = "target", allowManualPull = false })
+    t.Assert(act ~= "Dark Harvest", "DH should NOT cast if no DoTs tracked.")
 end

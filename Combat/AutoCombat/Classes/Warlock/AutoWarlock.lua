@@ -35,7 +35,14 @@ function AutoWarlock()
                 elseif ScriptExtender_IsSpellReady(action) then
                     ScriptExtender_Log("DEBUG: Casting -> " .. action)
                     CastSpellByName(action)
-                    ScriptExtender_Warlock_UpdateTracker(action, targetName, tm)
+
+                    -- Use PseudoID for tracking if available
+                    local pid = targetName
+                    if ScriptExtender_GetPseudoID then
+                        pid = ScriptExtender_GetPseudoID("target")
+                    end
+
+                    ScriptExtender_Warlock_UpdateTracker(action, pid, tm)
                     ScriptExtender_LastCastAction = action
                     ScriptExtender_LastCastTime = tm
                 else
