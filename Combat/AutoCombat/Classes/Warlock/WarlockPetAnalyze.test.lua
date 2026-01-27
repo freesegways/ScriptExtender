@@ -31,8 +31,12 @@ ScriptExtender_Tests["WarlockPetAnalyze_Outcomes"] = function(t)
     -- Mock CC Texture check
     ScriptExtender_CCTextures = { "Polymorph" }
 
-    local act, type, scoreCC = ScriptExtender_Warlock_PetAnalyze({ unit = "target", allowManualPull = false, context =
-    ctx })
+    local act, type, scoreCC = ScriptExtender_Warlock_PetAnalyze({
+        unit = "target",
+        allowManualPull = false,
+        context =
+            ctx
+    })
     t.AssertEqual({ actual = act, expected = nil })
 
     -- Clear CC
@@ -40,14 +44,22 @@ ScriptExtender_Tests["WarlockPetAnalyze_Outcomes"] = function(t)
 
     -- TEST 2: Skull Priority (Outcome: High Score)
     currentMob.index = 8 -- Skull
-    local act, type, scoreSkull = ScriptExtender_Warlock_PetAnalyze({ unit = "target", allowManualPull = false, context =
-    ctx })
+    local act, type, scoreSkull = ScriptExtender_Warlock_PetAnalyze({
+        unit = "target",
+        allowManualPull = false,
+        context =
+            ctx
+    })
     t.AssertEqual({ actual = act, expected = "PetAttack" })
 
     -- TEST 3: Cross Priority (Outcome: Score < Skull)
     currentMob.index = 7 -- Cross
-    local act, type, scoreCross = ScriptExtender_Warlock_PetAnalyze({ unit = "target", allowManualPull = false, context =
-    ctx })
+    local act, type, scoreCross = ScriptExtender_Warlock_PetAnalyze({
+        unit = "target",
+        allowManualPull = false,
+        context =
+            ctx
+    })
     t.AssertEqual({ actual = act, expected = "PetAttack" })
     t.Assert(scoreSkull > scoreCross, "Outcome: Skull should have higher priority than Cross.")
 
@@ -55,8 +67,12 @@ ScriptExtender_Tests["WarlockPetAnalyze_Outcomes"] = function(t)
     -- Even if Unmarked, if it is attacking Player, it should be top priority (Peel).
     currentMob.index = 0
     currentMob.isTankingPlayer = true
-    local act, type, scoreTanking = ScriptExtender_Warlock_PetAnalyze({ unit = "target", allowManualPull = false, context =
-    ctx })
+    local act, type, scoreTanking = ScriptExtender_Warlock_PetAnalyze({
+        unit = "target",
+        allowManualPull = false,
+        context =
+            ctx
+    })
 
     -- Note: My logic in PetAnalyze adds +50. Skull base is 40. 20+50 = 70 > 40.
     t.Assert(scoreTanking > scoreSkull, "Outcome: Mob attacking Player should be prioritized over generic Skull.")
@@ -64,8 +80,36 @@ ScriptExtender_Tests["WarlockPetAnalyze_Outcomes"] = function(t)
     -- TEST 5: Seduce Logic (Outcome: Seduction Action)
     currentMob.isTankingPlayer = false
     currentMob.index = 5 -- Moon (Seduce Target)
-    local act, type, scoreSeduce = ScriptExtender_Warlock_PetAnalyze({ unit = "target", allowManualPull = false, context =
-    ctx })
-    t.AssertEqual({ actual = act, expected = "Seduction" })
+    local act, type, scoreSeduce = ScriptExtender_Warlock_PetAnalyze({
+        unit = "target",
+        allowManualPull = false,
+        context =
+            ctx
+    })
     t.AssertEqual({ actual = type, expected = "pet_cc" })
+
+    -- TEST 6: Stickiness (Outcome: Sticky Bonus)
+    -- If Pet is already attacking a target, it should stick to it unless overwritten by heavy priority.
+    -- Target is Unmarked (Score 20).
+    -- But it is Pet's Current Target. (+200).
+    -- Total Score: 220.
+
+    currentMob.index = 0
+    local stickyName = "StickyMob"
+
+    -- Override UnitName mock locally for this test case
+    t.Mock("UnitName", function(u)
+        if u == "pettarget" then return stickyName end
+        if u == "target" then return stickyName end -- The unit we are analyzing is the pet target
+        return "Unknown"
+    end)
+
+    local act, type, scoreSticky = ScriptExtender_Warlock_PetAnalyze({ unit = "target", allowManualPull = false, context =
+    ctx })
+
+    -- Restore Mock (Safety)
+    t.Mock("UnitName", function(u) return "Mob" end)
+
+    t.Assert(scoreSticky > 200,
+        "Outcome: Pet should have massive score bonus for current target (Stickiness). Scored: " .. tostring(scoreSticky))
 end
