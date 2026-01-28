@@ -209,12 +209,8 @@ ScriptExtender_WarlockSpells = {
                 return 200 -- INSTANT CAST!
             end
 
-            -- Filler score
-            local score = 30
-            if mob.hpPct < 30 then
-                score = score + 40
-            end
-            return score
+            -- Filler score (extremely low to prioritize Wand/Drain/DoTs)
+            return 5
         end
     },
 

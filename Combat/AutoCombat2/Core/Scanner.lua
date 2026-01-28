@@ -241,7 +241,7 @@ local function GetRawMobData(unit)
     return mob
 end
 
-function ScriptExtender_Scanner.Scan()
+function ScriptExtender_Scanner.Scan(targetIsWorld)
     local ws = ScriptExtender_Scanner.WorldState
     ws.mobs = {}
 
@@ -306,6 +306,7 @@ function ScriptExtender_Scanner.Scan()
 
     -- 2. Discovery Strategy
     if UnitExists("target") and not UnitAffectingCombat("target") and UnitCanAttack("player", "target") then
+        ws.context.pullMode = true
         local mob = GetRawMobData("target")
         if mob then
             local discoveryKey = mob.name .. "_" .. mob.level .. "_" .. mob.maxHP
