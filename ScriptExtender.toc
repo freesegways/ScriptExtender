@@ -30,6 +30,7 @@ Utils\FindSpell.lua
 Utils\FindSpell.test.lua
 Utils\AuraUtils.lua
 Utils\UnitIdentity.lua
+Utils\UnitUtils.lua
 
 Constants\FoodAndWater.lua
 Constants\Potions.lua
@@ -93,3 +94,14 @@ Classes\Shaman\AutoShamanBuffs.lua
 Classes\Hunter\AutoHunterBuffs.lua
 
 UI\MacroWindow.xml
+
+# AutoCombat2
+Combat\AutoCombat2\Cache\DebuffPriority.lua
+Combat\AutoCombat2\Cache\SpellbookCache.lua
+Combat\AutoCombat2\Cache\RangeSlotCache.lua
+Combat\AutoCombat2\Cache\CooldownTracker.lua
+Combat\AutoCombat2\Core\Scanner.lua
+Combat\AutoCombat2\Core\Analyzer.lua
+Combat\AutoCombat2\Core\Executor.lua
+Combat\AutoCombat2\Classes\WarlockSpells.lua
+Combat\AutoCombat2\Core\Coordinator.lua

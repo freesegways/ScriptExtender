@@ -3,12 +3,37 @@
 if not WD_Track then WD_Track = {} end
 if not WD_MarkSafe then WD_MarkSafe = {} end
 
+-- Helper: Map Spell Name to Texture Partials (for generic matching)
+local DebuffTextureMap = {
+    ["Curse of the Elements"] = "ChillTouch",     -- Or "CurseOfSargeras"? Usually Elements icon. Checking WoWHead: Spell_Shadow_ChillTouch
+    ["Curse of Agony"] = "CurseOfSargeras",       -- Spell_Shadow_CurseOfSargeras
+    ["Corruption"] = "Abomination",               -- Spell_Shadow_Abomination
+    ["Immolate"] = "Immolation",                  -- Spell_Fire_Immolation
+    ["Siphon Life"] = "Requiem",                  -- Spell_Shadow_Requiem
+    ["Curse of Recklessness"] = "UnholyStrength", -- Spell_Shadow_UnholyStrength
+    ["Curse of Shadow"] = "CurseOfAchimonde",     -- Spell_Shadow_CurseOfAchimonde
+    ["Fear"] = "Possession",
+    ["Banish"] = "Binder"
+}
+
 -- Simple Helper to check if we know a spell
 local function HasSpell(name)
     if ScriptExtender_HasTalent and ScriptExtender_HasTalent(name) then return true end
     return ScriptExtender_IsSpellLearned(name)
 end
 
+-- Helper: Count Visual Occurrences of a Debuff Texture on Unit
+local function GetVisualDebuffCount(unit, texturePartial)
+    local count = 0
+    for i = 1, 16 do
+        local texture = UnitDebuff(unit, i)
+        if not texture then break end
+        if string.find(texture, texturePartial) then
+            count = count + 1
+        end
+    end
+    return count
+end
 
 function ScriptExtender_Warlock_UpdateTracker(s, n, tm)
     if ScriptExtender_TrackDebuff then
@@ -21,7 +46,7 @@ function ScriptExtender_Warlock_Analyze(params)
     local allowManualPull = params.allowManualPull
     local ctx = params.context
 
-    local pl = "player"
+    local class = "Warlock"
     -- Use Context for validation if available (fallback to raw if nil)
     if not ctx then ctx = ScriptExtender_GetCombatContext(u) end
 
@@ -67,23 +92,6 @@ function ScriptExtender_Warlock_Analyze(params)
     local isBoss = ctx.isBoss
     local isLowHP = (hpPct < 25)
 
-    -- Debuff Helper
-    local function HasDebuff(spell)
-        -- Check Tracker via Context (Preferred)
-        if ctx.trackedDebuffs and ctx.trackedDebuffs[spell] then return true end
-
-        -- Fallback to Global Tracker (Safety)
-        if ScriptExtender_IsDebuffTracked and ctx.pseudoID then
-            if ScriptExtender_IsDebuffTracked(ctx.pseudoID, spell) then return true end
-        end
-
-        -- Fallback to visible texture scanning (if implemented via mapping)
-        if spell == "Curse of Agony" and ScriptExtender_HasDebuff(u, "CurseOfSargeras") then return true end
-        if spell == "Corruption" and ScriptExtender_HasDebuff(u, "Abomination") then return true end
-        if spell == "Immolate" and ScriptExtender_HasDebuff(u, "Immolation") then return true end
-
-        return false
-    end
 
     -- === CANDIDATE ACTIONS ===
     local candidates = {}
@@ -128,9 +136,9 @@ function ScriptExtender_Warlock_Analyze(params)
 
             -- REQUIRE DOTS: Do not cast unless we have at least one DoT ticking.
             local dots = 0
-            if HasDebuff("Curse of Agony") then dots = dots + 1 end
-            if HasDebuff("Corruption") then dots = dots + 1 end
-            if HasDebuff("Immolate") then dots = dots + 1 end
+            if ScriptExtender_HasDebuffMatch(u, "Curse of Agony", class, ctx.pseudoID) then dots = dots + 1 end
+            if ScriptExtender_HasDebuffMatch(u, "Corruption", class, ctx.pseudoID) then dots = dots + 1 end
+            if ScriptExtender_HasDebuffMatch(u, "Immolate", class, ctx.pseudoID) then dots = dots + 1 end
 
             if dots == 0 then return false end
 
@@ -146,7 +154,7 @@ function ScriptExtender_Warlock_Analyze(params)
         cond = function()
             if isLowHP then return false end
             -- Check for Agony (Sargeras) OR Elements (ChillTouch/Malediction)
-            if HasDebuff("Curse of Agony") then return false end
+            if ScriptExtender_HasDebuffMatch(u, "Curse of Agony", class, ctx.pseudoID) then return false end
             if ScriptExtender_HasDebuff(u, "ChillTouch") then return false end -- Detection for Elements??
             -- Also check Name if texture fails
             if ScriptExtender_HasDebuff(u, "Curse of the Elements") then return false end
@@ -175,7 +183,7 @@ function ScriptExtender_Warlock_Analyze(params)
         base = 65, -- Lower than Agony (70), Higher than Corruption (60)
         cond = function()
             if isLowHP then return false end
-            if HasDebuff("Immolate") then return false end
+            if ScriptExtender_HasDebuffMatch(u, "Immolate", class, ctx.pseudoID) then return false end
 
             -- If we have Emberstorm or just good mana, use it
             return HasSpell("Immolate")
@@ -189,7 +197,7 @@ function ScriptExtender_Warlock_Analyze(params)
         base = 60,
         cond = function()
             if isLowHP then return false end
-            if HasDebuff("Corruption") then return false end
+            if ScriptExtender_HasDebuffMatch(u, "Corruption", class, ctx.pseudoID) then return false end
             return HasSpell("Corruption")
         end
     })

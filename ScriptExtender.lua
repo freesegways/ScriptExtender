@@ -17,8 +17,18 @@ function ScriptExtender_Print(msg)
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffScriptExtender|r: " .. tostring(msg))
 end
 
+-- Global Error Reporting (Fails Loudly)
+function ScriptExtender_Error(msg)
+    local formattedMsg = "ScriptExtender: " .. tostring(msg)
+    error(formattedMsg, 2)
+end
+
 -- Register a function for the Help command
-function ScriptExtender_Register(name, description, category)
+function ScriptExtender_Register(params)
+    local name = params.name
+    local description = params.description
+    local category = params.category
+
     local key = string.lower(name)
 
     if not category then
@@ -114,6 +124,10 @@ SE_ChannelFrame:RegisterEvent("SPELLCAST_CHANNEL_STOP")
 SE_ChannelFrame:RegisterEvent("SPELLCAST_CHANNEL_UPDATE")
 
 SE_ChannelFrame:SetScript("OnEvent", function()
+    -- Capture globals for linter and safety in 1.12
+    local event = event
+    local arg1 = arg1
+
     if event == "SPELLCAST_CHANNEL_START" then
         -- arg1 is duration in ms
         ScriptExtender_ChannelInfo.endTime = GetTime() + (arg1 / 1000)

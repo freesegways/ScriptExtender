@@ -24,3 +24,16 @@ function ScriptExtender_HasDebuff(unit, texturePattern)
     end
     return false, nil
 end
+
+-- Helper: Count Visual Occurrences of a Debuff Texture on Unit
+function ScriptExtender_GetVisualDebuffCount(unit, texturePartial)
+    local count = 0
+    for i = 1, 16 do
+        local texture = UnitDebuff(unit, i)
+        if not texture then break end
+        if string.find(texture, texturePartial) then
+            count = count + 1
+        end
+    end
+    return count
+end

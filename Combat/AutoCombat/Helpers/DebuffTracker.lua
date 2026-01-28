@@ -12,40 +12,27 @@ end
 local trackedDebuffs = {}
 
 -- Duration defaults (if not provided)
-local defaultDurations = {
-    ["Curse of Agony"] = 24,
-    ["Corruption"] = 18,
-    ["Immolate"] = 15,
-    ["Siphon Life"] = 30,
-    ["Curse of the Elements"] = 300,
-    ["Curse of Shadow"] = 300,
-    ["Curse of Recklessness"] = 120,
-    ["Curse of Tongues"] = 30,
-    ["Curse of Weakness"] = 120,
-    ["Fear"] = 20,
-    ["Howl of Terror"] = 15,
-    ["Banish"] = 30,
-    ["Dark Harvest"] = 30 -- Assuming 30s or similar
-}
-
--- Helper to clean old entries (Garbage Collection)
--- Call this periodically (e.g. every few seconds or on Analyze)
-function ScriptExtender_DebuffTracker_Cleanup()
-    local now = GetTime()
-    for pid, debuffs in pairs(trackedDebuffs) do
-        local count = 0
-        for name, expire in pairs(debuffs) do
-            if expire < now then
-                debuffs[name] = nil
-            else
-                count = count + 1
+-- Helper to get duration from Metadata
+local function GetDuration(spellName)
+    if ScriptExtender_ClassDebuffs then
+        for class, spells in pairs(ScriptExtender_ClassDebuffs) do
+            if spells[spellName] then
+                -- Handle table or legacy string
+                local meta = spells[spellName]
+                if type(meta) == "table" and meta.duration then
+                    return meta.duration
+                end
             end
         end
-        -- If table empty, remove the unit key
-        if count == 0 then
-            trackedDebuffs[pid] = nil
-        end
     end
+    -- Fallback defaults
+    local defaults = {
+        ["Curse of Agony"] = 24,
+        ["Corruption"] = 18,
+        ["Immolate"] = 15,
+        ["Siphon Life"] = 30
+    }
+    return defaults[spellName] or 15
 end
 
 -- Registers a debuff application
@@ -55,7 +42,7 @@ function ScriptExtender_TrackDebuff(pseudoID, spellName, duration)
 
     local now = GetTime()
     if not duration then
-        duration = defaultDurations[spellName] or 15
+        duration = GetDuration(spellName)
     end
 
     if not trackedDebuffs[pseudoID] then trackedDebuffs[pseudoID] = {} end
@@ -86,6 +73,94 @@ function ScriptExtender_IsDebuffTracked(pseudoID, spellName)
 end
 
 -- Debug Access
-function ScriptExtender_GetTrackedDebuffs()
-    return trackedDebuffs
+-- Generic Helper to check if a specific debuff is active, handling Multi-Class/Stacking logic.
+-- REPLACES: Local Class-Specific HasDebuff functions.
+function ScriptExtender_HasDebuffMatch(unit, spellName, className, pseudoID)
+    -- 1. Metadata Lookup
+    local meta = nil
+    if ScriptExtender_ClassDebuffs and ScriptExtender_ClassDebuffs[className] then
+        meta = ScriptExtender_ClassDebuffs[className][spellName]
+    end
+
+    local texturePartial = nil
+    local isStackable = true -- Default to TRUE (assume per-player if unknown)
+
+    if meta then
+        if type(meta) == "table" then
+            texturePartial = meta.texture
+            isStackable = meta.stackable
+        else
+            texturePartial = meta -- Legacy string support
+        end
+    end
+
+    -- 2. Check Personal Tracker (Always Trusted if positive)
+    local tracked = false
+    if pseudoID and trackedDebuffs[pseudoID] and trackedDebuffs[pseudoID][spellName] then
+        -- Verify not expired (lazy check usually handles this but double check)
+        if trackedDebuffs[pseudoID][spellName] > GetTime() then
+            tracked = true
+        end
+    end
+
+    if tracked then
+        -- Verify Visuals (Prevent Desync)
+        if texturePartial then
+            if not ScriptExtender_HasDebuff(unit, texturePartial) then
+                -- Visual Missing -> Tracker Desync
+                return false
+            end
+        end
+        return true
+    end
+
+    -- 3. Tracker says NO. Check Visuals + Reconciliation.
+    if texturePartial then
+        -- Helper from AuraUtils
+        local visualCount = 0
+        if ScriptExtender_GetVisualDebuffCount then
+            visualCount = ScriptExtender_GetVisualDebuffCount(unit, texturePartial)
+        else
+            -- Fallback if AuraUtils not available (Unit Tests)
+            for i = 1, 16 do
+                local d = UnitDebuff(unit, i)
+                if d and string.find(d, texturePartial) then visualCount = visualCount + 1 end
+            end
+        end
+
+        if visualCount > 0 then
+            -- If NOT stackable (e.g. Fear), finding one means it's active.
+            -- We don't care who cast it (unless we want to overwrite, but usually we respect it).
+            if not isStackable then
+                return true
+            end
+
+            -- If Stackable (Corruption), is it mine?
+            -- Use global Class Count
+            local classCount = 1
+            if ScriptExtender_GetClassCount then
+                classCount = ScriptExtender_GetClassCount(className)
+            end
+
+            -- Case A: Single Class (Me) + Visual Present = Mine (Tracker Lost It)
+            if classCount <= 1 then
+                return true
+            end
+
+            -- Case B: Multi Class
+            if visualCount < classCount then
+                -- E.g. 2 Warlocks, 1 Corruption. Tracker says NO.
+                -- Assume the 1 Corruption belongs to Other.
+                -- Return FALSE (Safe to cast).
+                return false
+            else
+                -- E.g. 2 Warlocks, 2 Corruptions. Tracker says NO.
+                -- Everyone has it. I must have it.
+                -- Return TRUE (Tracker Desync).
+                return true
+            end
+        end
+    end
+
+    return false
 end

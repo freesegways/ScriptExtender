@@ -80,3 +80,27 @@ ScriptExtender_SnareTextures = {
     "Spell_Shadow_ShadowWordPain", -- Mind Flay icon is often similar
     "Ability_Hunter_ViperSting"
 }
+
+-- 8. CLASS DEBUFFS: Mapping Spell Names to Texture Partials for Debuff Tracking
+ScriptExtender_ClassDebuffs = {
+    WARLOCK = {
+        -- DoTs (Stackable per caster)
+        ["Curse of the Elements"] = { texture = "ChillTouch", stackable = false, duration = 300 },     -- 5 min
+        ["Curse of Agony"] = { texture = "CurseOfSargeras", stackable = true, duration = 24 },         -- 24s
+        ["Corruption"] = { texture = "Abomination", stackable = true, duration = 18 },                 -- 18s
+        ["Immolate"] = { texture = "Immolation", stackable = true, duration = 15 },                    -- 15s
+        ["Siphon Life"] = { texture = "Requiem", stackable = true, duration = 30 },                    -- 30s
+        ["Curse of Recklessness"] = { texture = "UnholyStrength", stackable = false, duration = 120 }, -- 2 min
+        ["Curse of Shadow"] = { texture = "CurseOfAchimonde", stackable = false, duration = 300 },     -- 5 min
+        ["Fear"] = { texture = "Possession", stackable = false, duration = 20 },                       -- 20s
+        ["Banish"] = { texture = "Binder", stackable = false, duration = 30 },                         -- 30s
+        ["Drain Life"] = { texture = "LifeDrain", stackable = true, duration = 5 },                    -- Channel 5s
+        ["Drain Soul"] = { texture = "Haunt", stackable = true, duration = 15 },                       -- Channel 15s
+        ["Shadowburn"] = { texture = "ScourgeBuild", stackable = true, duration = 5 }                  -- Debuff 5s
+    },
+    PRIEST = {
+        ["Shadow Word: Pain"] = { texture = "ShadowWordPain", stackable = true },
+        ["Devouring Plague"] = { texture = "BlackPlague", stackable = true } -- Depends on race/CD but typically per caster
+    }
+    -- Add other classes as needed
+}
