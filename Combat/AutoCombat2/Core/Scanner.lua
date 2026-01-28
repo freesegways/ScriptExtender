@@ -14,6 +14,29 @@ ScriptExtender_Scanner = {
     }
 }
 
+---@class MobData
+---@field unit string The unitID (e.g. "target", "party1target")
+---@field name string Name of the mob
+---@field hp number Current HP
+---@field maxHP number Maximum HP
+---@field hpPct number Health Percentage (0-100)
+---@field hpBucket number HP Bucket (0-10)
+---@field energyBucket number Mana/Energy Bucket (0-10)
+---@field level number Unit Level
+---@field classification string "normal", "elite", "worldboss", etc.
+---@field creatureType string "Humanoid", "Beast", etc.
+---@field raidIcon number Raid Icon Index (0-8)
+---@field rangeBucket number Estimated Distance Bucket (0-3)
+---@field debuffs table Raw debuff data
+---@field inCombat boolean Is the mob affecting combat?
+---@field isCasting string|nil Name of spell being cast, or nil
+---@field target string|nil Name of the unit the mob is targeting
+---@field targetedByCount number How many friendly units are targeting this mob
+---@field isFleeing boolean Heuristic for fleeing mobs
+---@field toughness number Calculated threat/strength rating
+---@field pseudoID string | nil  Unique identifier for tracking
+---@field myDebuffs table Map of debuffs applied by the player [SpellName]=true
+
 -- Private Helper: Calculate Buckets
 local function CalculateBuckets(val, max)
     if not val or not max or max == 0 then return 0, 0 end
@@ -309,6 +332,8 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
         targetPseudoID = ScriptExtender_Scanner.GeneratePseudoID({ unit = "target" })
     }
 
+
+    ---@type table<string, MobData>
     local mobAccumulator = {}
 
     -- 2. Discovery Strategy
