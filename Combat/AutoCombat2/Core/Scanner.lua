@@ -239,6 +239,12 @@ local function GetRawMobData(unit)
         if sName then mob.isCasting = sName end
     end
 
+    -- Fleeing Heuristic (Humanoids run at low HP)
+    mob.isFleeing = false
+    if mob.inCombat and mob.hpPct < 20 and (mob.creatureType == "Humanoid") then
+        mob.isFleeing = true
+    end
+
     return mob
 end
 

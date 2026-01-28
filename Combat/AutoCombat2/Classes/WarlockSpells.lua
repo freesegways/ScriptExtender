@@ -131,9 +131,12 @@ ScriptExtender_WarlockSpells = {
             if mob.toughness > 3 or mob.classification == "elite" or mob.classification == "worldboss" then
                 -- High Value Target: Acceleration provides massive throughput boost
                 score = score + 50
-            elseif mob.toughness < 1.5 then
-                -- Low Toughness Strategy: Reap them fast!
-                score = score + 45
+            elseif mob.toughness < 1.2 then
+                -- Low Toughness Strategy: Only use if heavily dotted (not just Agony) or if finisher
+                -- Reduced from +45 to avoid over-committing on weak trash
+                if affliDots > 1 then
+                    score = score + 10
+                end
             end
 
             -- Finisher Logic: Cooldown resets if they die during channel

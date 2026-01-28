@@ -11,11 +11,26 @@ ScriptExtender_WarlockPetSpells = {
         target = "pet_enemy",
         isCommand = true,
         score = function(mob, ws, pet)
-            -- if pet.inCombat then return 0 end -- Allow switching targets or re-engaging
+            if mob.debuffs.hasCC then return 0 end -- Never break CC
+
+            local score = 0
+
+            -- 1. Focus Fire: Attack Player's Target
             if ws.context.targetPseudoID == mob.pseudoID then
-                return 100
+                score = 100
             end
-            return 0
+
+            -- 2. Defend Player: If mob is attacking player, increase priority
+            if mob.target == UnitName("player") then
+                score = score + 50 -- Heavy weight to peel aggro
+            end
+
+            -- 3. Avoid Runners (Risk of body pull)
+            if mob.isFleeing then
+                score = score - 60
+            end
+
+            return score
         end,
 
     },
@@ -55,6 +70,7 @@ ScriptExtender_WarlockPetSpells = {
     ["Lash of Pain"] = {
         target = "pet_enemy",
         score = function(mob, ws, pet)
+            if mob.debuffs.hasCC then return 0 end
             if pet.manaPct > 20 then return 60 end
             return 0
         end,
@@ -75,7 +91,20 @@ ScriptExtender_WarlockPetSpells = {
     ["Firebolt"] = {
         target = "pet_enemy",
         score = function(mob, ws, pet)
-            return 50 -- basic filler
+            if mob.debuffs.hasCC then return 0 end
+            local score = 50
+
+            -- Prioritize defensive targets
+            if mob.target == UnitName("player") then
+                score = score + 20
+            end
+
+            -- Prioritize current target slightly more to prevent switching mid-cast
+            if ws.context.targetPseudoID == mob.pseudoID then
+                score = score + 10
+            end
+
+            return score
         end,
 
     }
