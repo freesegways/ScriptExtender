@@ -185,7 +185,7 @@ function ScriptExtender_Scanner.GeneratePseudoID(params)
         debuffHash = d.hash
     end
 
-    return string.format(
+    local pseudoID = string.format(
         "%s_%d_%d_%s_%s_%s_%d_%d_%s_%d_%s",
         name or "Unknown",
         maxHP or 0,
@@ -199,6 +199,7 @@ function ScriptExtender_Scanner.GeneratePseudoID(params)
         debuffHash,
         tostring(inCombat or false)
     )
+    return pseudoID
 end
 
 -- Private Helper: Extract raw mob data from a unit token

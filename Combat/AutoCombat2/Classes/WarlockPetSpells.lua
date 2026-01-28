@@ -11,7 +11,7 @@ ScriptExtender_WarlockPetSpells = {
         target = "pet_enemy",
         isCommand = true,
         score = function(mob, ws, pet)
-            if pet.inCombat then return 0 end
+            -- if pet.inCombat then return 0 end -- Allow switching targets or re-engaging
             if ws.context.targetPseudoID == mob.pseudoID then
                 return 100
             end

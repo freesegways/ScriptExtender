@@ -29,13 +29,15 @@ ScriptExtender_Analyzer = {
                 for spellName, spellData in pairs(spellTable) do
                     if (spellData.target == "enemy" or spellData.target == "pet_enemy") and isOffensiveLegal then
                         local score = 0
+                        local isPetSpell = (source == "pet")
+
                         if ScriptExtender_CooldownTracker.IsReady(spellName) then
                             local ready = false
 
                             -- Special Case: Pet Commands (Attack, Follow, etc) skip the bar/cooldown check
-                            if isPet and spellData.isCommand then
+                            if isPetSpell and spellData.isCommand then
                                 ready = true
-                            elseif isPet then
+                            elseif isPetSpell then
                                 -- Pet Logic: Check Pet Action Bar
                                 for i = 1, 10 do
                                     local name = GetPetActionInfo(i)
@@ -68,7 +70,9 @@ ScriptExtender_Analyzer = {
                                 end
 
                                 if inRange then
-                                    score = spellData.score(mob, ws, casterState)
+                                    local context = casterState
+                                    if isPetSpell then context = ws.context.pet end
+                                    score = spellData.score(mob, ws, context)
                                 end
                             end
                         end
@@ -93,11 +97,13 @@ ScriptExtender_Analyzer = {
             for spellName, spellData in pairs(spellTable) do
                 if spellData.target == "player" or spellData.target == "pet" then
                     local score = 0
+                    local isPetSpell = (source == "pet")
+
                     if ScriptExtender_CooldownTracker.IsReady(spellName) then
                         local ready = false
-                        if isPet and spellData.isCommand then
+                        if isPetSpell and spellData.isCommand then
                             ready = true
-                        elseif isPet then
+                        elseif isPetSpell then
                             for i = 1, 10 do
                                 local name = GetPetActionInfo(i)
                                 if name == spellName then
@@ -115,7 +121,9 @@ ScriptExtender_Analyzer = {
                         end
 
                         if ready then
-                            score = spellData.score(nil, ws, casterState)
+                            local context = casterState
+                            if isPetSpell then context = ws.context.pet end
+                            score = spellData.score(nil, ws, context)
                         end
                     end
 

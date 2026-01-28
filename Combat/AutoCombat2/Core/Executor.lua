@@ -119,19 +119,14 @@ ScriptExtender_Executor = {
         local spellName = action.action
 
         -- Pet Spell? (Implicit execution via API usually, but standardized here)
-        if action.unit == "pet" then
-            -- Pet casting is handled via specialized logic usually, but here we assume standard cast
-            -- For many pet actions (e.g. commands), we rely on action.execute if it existed, but now we use CastPetAction or CastSpellByName logic
-            -- However, standard WarlockPetSpells uses 'execute' mostly.
-            -- WAIT: I removed action.execute. I need to check how Pet Spells are cast now.
-            -- Checking WarlockPetSpells...
-            -- Ah, WarlockPetSpells used 'execute' helper. I removed it.
-            -- I need to restore standard casting for pets or handle it.
-            -- Standard Pet Casting in 1.12: CastPetAction(slot) or CastSpellByName(petSpell)
-            -- Let's use CastSpellByName for now as it's generic, or look up slot.
-
-            -- Note: Analyzer checks correctness. Here we just trigger.
-            CastSpellByName(spellName)
+        if action.source == "pet" then
+            if spellName == "PetAttack" then
+                PetAttack()
+            elseif spellName == "PetFollow" then
+                PetFollow()
+            else
+                CastSpellByName(spellName)
+            end
             return true
         end
 

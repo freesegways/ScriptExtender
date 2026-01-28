@@ -40,6 +40,10 @@ ScriptExtender_Coordinator = {
 
         local ws = ScriptExtender_Scanner.Scan()
 
+        if not next(ws.mobs) then
+            return
+        end
+
         local _, playerClass = UnitClass("player")
         local spellTable = nil
         local petSpellTable = nil
