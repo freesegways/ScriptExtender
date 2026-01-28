@@ -246,9 +246,35 @@ function ScriptExtender_Scanner.Scan()
     ws.mobs = {}
 
     -- 1. Scan Context
+    local _, class = UnitClass("player")
+    local shardCount = 0
+    if class == "WARLOCK" then
+        local found = 0
+        for bag = 0, 4 do
+            for slot = 1, GetContainerNumSlots(bag) do
+                local link = GetContainerItemLink(bag, slot)
+                if link and string.find(link, "Soul Shard") then
+                    local _, count = GetContainerItemInfo(bag, slot)
+                    found = found + (count or 1)
+                end
+            end
+        end
+        shardCount = found
+    end
+
+    local buffs = {}
+    for i = 1, 32 do
+        local b = UnitBuff("player", i)
+        if not b then break end
+        buffs[b] = true
+    end
+
     ws.context = {
         playerHP = UnitHealth("player"),
         playerMana = UnitMana("player"),
+        playerClass = class,
+        playerShards = shardCount,
+        playerBuffs = buffs,
         inCombat = UnitAffectingCombat("player"),
         target = UnitName("target"),
         targetPseudoID = ScriptExtender_Scanner.GeneratePseudoID({ unit = "target" })

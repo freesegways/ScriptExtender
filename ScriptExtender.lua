@@ -24,25 +24,33 @@ function ScriptExtender_Error(msg)
 end
 
 -- Register a function for the Help command
-function ScriptExtender_Register(params)
-    local name = params.name
-    local description = params.description
-    local category = params.category
+-- Supports:
+-- 1. ScriptExtender_Register({ name = "FuncName", command = "alias", description = "..." })
+-- 2. ScriptExtender_Register("FuncName", "description", "category")
+function ScriptExtender_Register(a1, a2, a3)
+    local name, command, description, category
+    if type(a1) == "table" then
+        name = a1.name
+        command = a1.command or a1.name
+        description = a1.description
+        category = a1.category
+    else
+        name = a1
+        command = a1
+        description = a2
+        category = a3
+    end
 
-    local key = string.lower(name)
+    if not name then return end
+    local key = string.lower(command)
 
     if not category then
         category = "Unknown"
-        -- Try to infer from debug info if available, but safeguard against errors
         if debug and debug.getinfo then
             local status, info = pcall(debug.getinfo, 2, "S")
             if status and info and info.source then
-                -- Extract path after ScriptExtender
                 local src = string.gsub(info.source, "\\", "/")
-                if string.sub(src, 1, 1) == "@" then
-                    src = string.sub(src, 2)
-                end
-
+                if string.sub(src, 1, 1) == "@" then src = string.sub(src, 2) end
                 local _, _, msg = string.find(src, "ScriptExtender/(.*)/[^/]+%.lua$")
                 if msg then category = msg end
             end
@@ -50,8 +58,14 @@ function ScriptExtender_Register(params)
     end
 
     ScriptExtender_Commands[key] = { name = name, desc = description, category = category }
-    -- We'll log to debug instead of chat to avoid cluttering at login
-    ScriptExtender_Log("Registered: " .. name .. " [" .. category .. "]")
+
+    -- Also register the full name as a fallback command if it differs from the alias
+    local nameKey = string.lower(name)
+    if nameKey ~= key then
+        ScriptExtender_Commands[nameKey] = { name = name, desc = description, category = category, isAlias = true }
+    end
+
+    ScriptExtender_Log("Registered: " .. key .. " -> " .. name .. " [" .. category .. "]")
 end
 
 -- Slash Command Handler

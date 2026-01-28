@@ -100,6 +100,7 @@ Combat\AutoCombat2\Cache\DebuffPriority.lua
 Combat\AutoCombat2\Cache\SpellbookCache.lua
 Combat\AutoCombat2\Cache\RangeSlotCache.lua
 Combat\AutoCombat2\Cache\CooldownTracker.lua
+Combat\AutoCombat2\Cache\TalentCache.lua
 Combat\AutoCombat2\Core\Scanner.lua
 Combat\AutoCombat2\Core\Analyzer.lua
 Combat\AutoCombat2\Core\Executor.lua

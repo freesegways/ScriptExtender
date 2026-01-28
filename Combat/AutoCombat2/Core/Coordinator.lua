@@ -21,6 +21,7 @@ ScriptExtender_Coordinator = {
         ScriptExtender_Log("AutoCombat2: Refreshing Caches (5m Expiry or Init)...")
         ScriptExtender_RangeSlotCache.Update()
         ScriptExtender_SpellbookCache.Update()
+        ScriptExtender_TalentCache.Update()
         ScriptExtender_Coordinator.lastCacheUpdate = GetTime()
     end,
 
@@ -106,6 +107,7 @@ end
 if ScriptExtender_Register then
     ScriptExtender_Register({
         name = "ScriptExtender_AutoCombat2_Run",
-        description = "Runs AutoCombat2 Decision Cycle"
+        command = "ac2",
+        description = "Runs AutoCombat2 Decision Cycle (The Global Brain)"
     })
 end
