@@ -390,7 +390,8 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
         -- 5.0 = Dungeon Elite.
         -- 20.0+ = Raid Boss.
         local gPower = 1 + (gSize - 1) * 0.25 -- Group power scaling
-        mob.toughness = mob.maxHP / (pMaxHP * gPower)
+        -- toughness is current hp over p max hp times group power
+        mob.toughness = mob.hp / (pMaxHP * gPower)
 
         -- Level Adjustment (Higher level mobs are tougher)
         local levelDiff = mob.level - pLevel
