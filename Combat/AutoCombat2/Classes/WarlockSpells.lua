@@ -60,7 +60,29 @@ ScriptExtender_WarlockSpells = {
         end
     },
 
-    -- 4. CURSE OF RECKLESSNESS (Utility/Hybrid)
+    -- 4. SIPHON LIFE (DoT / Multi-Target Healing)
+    ["Siphon Life"] = {
+        sameRangeAs = "Shadow Bolt",
+        target = "enemy",
+        score = function(mob, ws, player)
+            if mob.debuffs.hasCC then return 0 end
+            if not ScriptExtender_TalentCache.HasTalent("Siphon Life") then return 0 end
+            if mob.myDebuffs["Siphon Life"] then return 0 end
+
+            -- Scoring: Great for long fights (Toughness > 2)
+            local score = 55
+            if mob.toughness > 3 or mob.classification == "elite" then
+                score = score + 20
+            end
+
+            -- Lower priority if the mob is about to die
+            if mob.hpPct < 25 and mob.classification == "normal" then return 0 end
+
+            return score
+        end
+    },
+
+    -- 5. CURSE OF RECKLESSNESS (Utility/Hybrid)
     ["Curse of Recklessness"] = {
         sameRangeAs = "Shadow Bolt",
         target = "enemy",
@@ -87,7 +109,7 @@ ScriptExtender_WarlockSpells = {
         end
     },
 
-    -- 5. DARK HARVEST (Burst - Requires DoTs)
+    -- 5. DARK HARVEST (Finisher & DoT Accelerator)
     ["Dark Harvest"] = {
         sameRangeAs = "Shadow Bolt",
         target = "enemy",
@@ -95,15 +117,40 @@ ScriptExtender_WarlockSpells = {
             if mob.debuffs.hasCC then return 0 end
             if not ScriptExtender_TalentCache.HasTalent("Dark Harvest") then return 0 end
 
-            -- Require at least One DoT (Plan 137)
-            local dots = 0
-            if mob.myDebuffs["Corruption"] then dots = dots + 1 end
-            if mob.myDebuffs["Immolate"] then dots = dots + 1 end
-            if mob.myDebuffs["Curse of Agony"] or mob.myDebuffs["Curse of Recklessness"] then dots = dots + 1 end
+            local score = 35 -- Base value for damage
+            local affliDots = 0
+            if mob.myDebuffs["Corruption"] then affliDots = affliDots + 1 end
+            if mob.myDebuffs["Curse of Agony"] then affliDots = affliDots + 1 end
+            if mob.myDebuffs["Unstable Affliction"] then affliDots = affliDots + 1 end
+            if mob.myDebuffs["Siphon Life"] then affliDots = affliDots + 1 end
 
-            if dots == 0 then return 0 end
+            -- Synergy: Each Affliction DoT makes this spell significantly better (30% faster ticks)
+            score = score + (affliDots * 25)
 
-            return 80 -- High priority burst
+            -- POWER HEURISTIC (Globalized in Scanner)
+            if mob.toughness > 3 or mob.classification == "elite" or mob.classification == "worldboss" then
+                -- High Value Target: Acceleration provides massive throughput boost
+                score = score + 50
+            elseif mob.toughness < 1.5 then
+                -- Low Toughness Strategy: Reap them fast!
+                score = score + 45
+            end
+
+            -- Finisher Logic: Cooldown resets if they die during channel
+            -- Reset potential is extremely valuable regardless of toughness
+            if mob.hpPct < 15 and ws.context.playerShards >= 5 then
+                score = score + 120
+            elseif mob.hpPct < 30 then
+                -- Broaden the "Useful as finisher" window
+                score = score + 30
+            end
+
+            -- Safety: If we lack DoTs, acceleration is wasted.
+            if affliDots == 0 and not mob.myDebuffs["Immolate"] then
+                return 0 -- Don't waste the cooldown
+            end
+
+            return score
         end
     },
 
@@ -123,7 +170,7 @@ ScriptExtender_WarlockSpells = {
         end
     },
 
-    -- 7. DRAIN SOUL (Resource Management)
+    -- 7. DRAIN SOUL (Bread and Butter Filler)
     ["Drain Soul"] = {
         sameRangeAs = "Shadow Bolt",
         target = "enemy",
@@ -135,12 +182,22 @@ ScriptExtender_WarlockSpells = {
                 return 90
             end
 
-            -- Low priority filler
+            -- Bread and Butter: After DoTs are applied, we Drain.
+            -- This beats Shadow Bolt (30) as a default filler.
+            if mob.myDebuffs["Corruption"] then
+                local fillerScore = 45
+                if mob.myDebuffs["Curse of Agony"] or mob.myDebuffs["Siphon Life"] then
+                    fillerScore = 55
+                end
+                return fillerScore
+            end
+
+            -- Default low priority
             return 10
         end
     },
 
-    -- 8. SHADOW BOLT (Nightfall / Filler)
+    -- 8. SHADOW BOLT (Nightfall / Backup Filler)
     ["Shadow Bolt"] = {
         sameRangeAs = "Shadow Bolt",
         target = "enemy",
@@ -176,5 +233,5 @@ ScriptExtender_WarlockSpells = {
             end
             return 0
         end
-    }
+    },
 }

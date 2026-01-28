@@ -5,81 +5,68 @@ if ScriptExtender_Analyzer then return end
 
 ScriptExtender_Analyzer = {
     -- Evaluate WorldState and return sorted ActionList
-    -- Evaluate WorldState and return sorted ActionList
-    -- Evaluate WorldState and return sorted ActionList
     Analyze = function(params)
         local ws = params.worldState
         local spellTable = params.spellTable
         local casterUnit = params.casterUnit or "player"
-
         local actionList = {}
 
-        -- 1. Validate Spell Table
-        if not spellTable then
-            return {}
-        end
+        if not spellTable then return {} end
 
-        -- 2. Caster State helper for scoring
         local casterState = {
             name = UnitName(casterUnit),
             hpPct = (UnitHealth(casterUnit) / UnitHealthMax(casterUnit)) * 100,
-            manaPct = (UnitMana(casterUnit) / UnitManaMax(casterUnit)) * 100
+            manaPct = (UnitMana(casterUnit) / (UnitManaMax(casterUnit) or 1)) * 100
         }
 
-        -- 3. Iterate Spells (Outer Loop? Or Mobs Outer Loop?)
-        -- Mobs Outer Loop seems better for "Target Switching" focus,
-        -- but Spells Outer Loop is better for "I really need to Heal".
-        -- Actually, we treat every (Mob, Spell) pair as a candidate.
+        local isPet = (casterUnit == "pet")
 
-        -- A. Target Actions (Spells against Mobs)
+        -- 1. Target Actions (Enemy/PetEnemy)
         for _, mob in pairs(ws.mobs) do
-            -- Safety Gate: Only offensive if mob is In Combat OR is our specific Pull Focus
             local isOffensiveLegal = mob.inCombat or (ws.context.targetPseudoID == mob.pseudoID)
 
             for spellName, spellData in pairs(spellTable) do
-                if spellData.target == "enemy" and isOffensiveLegal then
+                if (spellData.target == "enemy" or spellData.target == "pet_enemy") and isOffensiveLegal then
                     local score = 0
-
-                    -- GATE 1: Internal Cooldown
                     if ScriptExtender_CooldownTracker.IsReady(spellName) then
-                        -- GATE 2: Game Cooldown & Usability (Mana)
-                        -- We need the Spell ID from SpellbookCache
-                        local spellID = ScriptExtender_SpellbookCache.GetSpellID(spellName)
+                        local ready = false
 
-                        -- If we don't know the spell, we can't cast it.
-                        if spellID then
-                            local start, duration = GetSpellCooldown(spellID, BOOKTYPE_SPELL)
-                            local onCD = (start > 0 and duration > 1.5) -- Ignore GCD
+                        -- Special Case: Pet Commands (Attack, Follow, etc) skip the bar/cooldown check
+                        if isPet and spellData.isCommand then
+                            ready = true
+                        elseif isPet then
+                            -- Pet Logic: Check Pet Action Bar
+                            for i = 1, 10 do
+                                local name = GetPetActionInfo(i)
+                                if name and name == spellName then
+                                    local start, duration = GetPetActionCooldown(i)
+                                    if start == 0 or duration <= 1.5 then
+                                        ready = true
+                                    end
+                                    break
+                                end
+                            end
+                        else
+                            -- Player Logic
+                            local spellID = ScriptExtender_SpellbookCache.GetSpellID(spellName)
+                            if spellID then
+                                local start, duration = GetSpellCooldown(spellID, BOOKTYPE_SPELL)
+                                if (start == 0 or duration <= 1.5) then
+                                    local slot = ScriptExtender_RangeSlotCache.GetSlot(spellName)
+                                    if not slot or IsUsableAction(slot) then ready = true end
+                                end
+                            end
+                        end
 
-                            -- Point 2.1: IsUsableSpell doesn't exist in 1.12. Use Action Slot if possible.
-                            local usable = true
-                            local slot = ScriptExtender_RangeSlotCache.GetSlot(spellName)
-                            if slot then
-                                usable = IsUsableAction(slot)
+                        if ready then
+                            local inRange = true
+                            local rangeSlot = ScriptExtender_RangeSlotCache.GetSlot(spellData.sameRangeAs or spellName)
+                            if rangeSlot then
+                                if IsActionInRange(rangeSlot, mob.unit) == 0 then inRange = false end
                             end
 
-                            if not onCD and usable then
-                                -- GATE 3: Range Check
-                                -- Use RangeSlotCache if available, else fallback to bucket
-                                local inRange = true
-
-                                -- If the spell has a specific range check slot
-                                local rangeSlot = ScriptExtender_RangeSlotCache.GetSlot(spellData.sameRangeAs or
-                                    spellName)
-                                if rangeSlot then
-                                    -- IsActionInRange: 1=True, 0=False, nil=Invalid
-                                    local valid = IsActionInRange(rangeSlot, mob.unit)
-                                    if valid == 0 then inRange = false end
-                                else
-                                    -- Fallback: Use Bucket (Very rough)
-                                    -- If bucket is 3 (Far) and spell is Melee, fail
-                                    -- This is weak, but RangeSlotCache should cover 99% of cases
-                                end
-
-                                if inRange then
-                                    -- SCORING
-                                    score = spellData.score(mob, ws, casterState)
-                                end
+                            if inRange then
+                                score = spellData.score(mob, ws, casterState)
                             end
                         end
                     end
@@ -89,51 +76,57 @@ ScriptExtender_Analyzer = {
                             action = spellName,
                             target = mob.pseudoID,
                             score = score,
-                            unit = mob.unit -- fallback
+                            unit = mob.unit,
+                            execute = spellData.execute
                         })
                     end
                 end
             end
         end
 
-        -- B. Self Actions (Life Tap, Buffs)
+        -- 2. Self Actions (Player/Pet)
         for spellName, spellData in pairs(spellTable) do
-            if spellData.target == "player" then
+            if spellData.target == "player" or spellData.target == "pet" then
                 local score = 0
-
-                -- Checks (Simplified for Self)
                 if ScriptExtender_CooldownTracker.IsReady(spellName) then
-                    local spellID = ScriptExtender_SpellbookCache.GetSpellID(spellName)
-                    if spellID then
-                        local start, duration = GetSpellCooldown(spellID, BOOKTYPE_SPELL)
-                        local onCD = (start > 0 and duration > 1.5)
-                        -- IsUsableSpell checks mana, but for Life Tap mana isn't the cost (HP is)
-                        -- So we might skip IsUsable check for some, or trust the API.
-                        -- Life Tap returns usable if you have HP.
-
-                        if not onCD then
-                            score = spellData.score(nil, ws, casterState)
+                    local ready = false
+                    if isPet and spellData.isCommand then
+                        ready = true
+                    elseif isPet then
+                        for i = 1, 10 do
+                            local name = GetPetActionInfo(i)
+                            if name == spellName then
+                                local start, duration = GetPetActionCooldown(i)
+                                if start == 0 or duration <= 1.5 then ready = true end
+                                break
+                            end
                         end
+                    else
+                        local spellID = ScriptExtender_SpellbookCache.GetSpellID(spellName)
+                        if spellID then
+                            local start, duration = GetSpellCooldown(spellID, BOOKTYPE_SPELL)
+                            if start == 0 or duration <= 1.5 then ready = true end
+                        end
+                    end
+
+                    if ready then
+                        score = spellData.score(nil, ws, casterState)
                     end
                 end
 
                 if score > 0 then
                     table.insert(actionList, {
                         action = spellName,
-                        target = casterUnit,
+                        target = spellData.target,
                         score = score,
-                        unit = casterUnit
+                        unit = casterUnit,
+                        execute = spellData.execute
                     })
                 end
             end
         end
 
-        -- 4. Sort (Highest Score First)
         table.sort(actionList, function(a, b) return a.score > b.score end)
-
-        ScriptExtender_Log("Analyzer: Evaluated " ..
-            table.getn(actionList) .. " valid actions. Top: " .. (actionList[1] and actionList[1].action or "None"))
-
         return actionList
     end
 }

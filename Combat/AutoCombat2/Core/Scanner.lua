@@ -269,12 +269,34 @@ function ScriptExtender_Scanner.Scan()
         buffs[b] = true
     end
 
+    local groupSize = 1
+    if GetNumRaidMembers() > 0 then
+        groupSize = GetNumRaidMembers()
+    elseif GetNumPartyMembers() > 0 then
+        groupSize = GetNumPartyMembers() + 1
+    end
+
+    local petData = nil
+    if UnitExists("pet") then
+        petData = {
+            family = UnitCreatureFamily("pet"),
+            hpPct = (UnitHealth("pet") / UnitHealthMax("pet")) * 100,
+            manaPct = (UnitMana("pet") / (UnitManaMax("pet") or 1)) * 100,
+            target = nil, -- UnitTarget("pet") doesn't exist in 1.12
+            inCombat = UnitAffectingCombat("pet")
+        }
+    end
+
     ws.context = {
         playerHP = UnitHealth("player"),
+        playerMaxHP = UnitHealthMax("player"),
+        playerLevel = UnitLevel("player"),
         playerMana = UnitMana("player"),
         playerClass = class,
         playerShards = shardCount,
         playerBuffs = buffs,
+        pet = petData,
+        groupSize = groupSize,
         inCombat = UnitAffectingCombat("player"),
         target = UnitName("target"),
         targetPseudoID = ScriptExtender_Scanner.GeneratePseudoID({ unit = "target" })
@@ -348,10 +370,26 @@ function ScriptExtender_Scanner.Scan()
         end
     end
 
-    -- 5. Finalize PseudoIDs & Reconcile Debuffs
+    -- 5. Finalize PseudoIDs, Toughness & Reconcile Debuffs
     local finalMobs = {}
+    local pMaxHP = ws.context.playerMaxHP or 1
+    local gSize = ws.context.groupSize or 1
+    local pLevel = ws.context.playerLevel or 60
 
     for _, mob in pairs(mobAccumulator) do
+        -- TOUGHNESS HEURISTIC:
+        -- 1.0 = About as tough as the player.
+        -- 5.0 = Dungeon Elite.
+        -- 20.0+ = Raid Boss.
+        local gPower = 1 + (gSize - 1) * 0.25 -- Group power scaling
+        mob.toughness = mob.maxHP / (pMaxHP * gPower)
+
+        -- Level Adjustment (Higher level mobs are tougher)
+        local levelDiff = mob.level - pLevel
+        if levelDiff > 0 then
+            mob.toughness = mob.toughness * (1 + (levelDiff * 0.1))
+        end
+
         mob.pseudoID = ScriptExtender_Scanner.GeneratePseudoID({
             unit = mob.unit,
             targetedByCount = mob.targetedByCount,

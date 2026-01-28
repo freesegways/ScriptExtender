@@ -105,4 +105,5 @@ Combat\AutoCombat2\Core\Scanner.lua
 Combat\AutoCombat2\Core\Analyzer.lua
 Combat\AutoCombat2\Core\Executor.lua
 Combat\AutoCombat2\Classes\WarlockSpells.lua
+Combat\AutoCombat2\Classes\WarlockPetSpells.lua
 Combat\AutoCombat2\Core\Coordinator.lua

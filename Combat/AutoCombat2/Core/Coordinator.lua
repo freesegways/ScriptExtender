@@ -69,7 +69,33 @@ ScriptExtender_Coordinator = {
             casterUnit = "player"
         })
 
+        -- 2.1 Analyze Pet (Independent of Player GCD)
+        local petActionList = nil
+        if UnitExists("pet") then
+            if ScriptExtender_WarlockPetSpells then
+                ScriptExtender_Log("Coordinator: Analyzing Pet Family: " ..
+                tostring(ws.context.pet and ws.context.pet.family or "Unknown"))
+                petActionList = ScriptExtender_Analyzer.Analyze({
+                    worldState = ws,
+                    spellTable = ScriptExtender_WarlockPetSpells,
+                    casterUnit = "pet"
+                })
+                if petActionList and table.getn(petActionList) > 0 then
+                    ScriptExtender_Log("Coordinator: Pet Action List count: " .. table.getn(petActionList))
+                end
+            else
+                ScriptExtender_Log("Coordinator: Pet exists but ScriptExtender_WarlockPetSpells is nil!")
+            end
+        end
+
         -- 3. Execute
+        if petActionList and table.getn(petActionList) > 0 then
+            local petExecuted = ScriptExtender_Executor.Execute(petActionList, ws)
+            if petExecuted then
+                ScriptExtender_Log("Coordinator: Pet Action Executed.")
+            end
+        end
+
         local executed = ScriptExtender_Executor.Execute(actionList, ws)
 
         if executed then
