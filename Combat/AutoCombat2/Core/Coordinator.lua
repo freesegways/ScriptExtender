@@ -42,6 +42,12 @@ ScriptExtender_Coordinator = {
         local ws = ScriptExtender_Scanner.Scan()
 
         if not next(ws.mobs) then
+            -- Cleanup: If we discovered enemies but none were pullable/in-combat, clear the target.
+            -- This prevents the bot from leaving you targeting random OOC mobs after a scan cycle.
+            if not ws.context.pullMode and UnitExists("target") and not UnitAffectingCombat("target") then
+                ClearTarget()
+                ScriptExtender_Log("AutoCombat2: No combat found. Clearing discovered target.")
+            end
             return
         end
 
