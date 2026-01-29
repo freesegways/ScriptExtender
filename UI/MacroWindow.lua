@@ -95,13 +95,23 @@ function SE_OnShow()
     child:SetHeight(math.abs(yOffset) + 20)
 end
 
+-- Log functionality
+function SE_LogToUI(msg)
+    if SE_LogFrame then
+        SE_LogFrame:AddMessage(msg)
+    end
+end
+
 function SE_MacroEntry_Run(frame)
     local cmdName = frame.commandName
     if cmdName then
-        ScriptExtender_Print("Executing UI command: " .. cmdName)
+        local input = getglobal(frame:GetName() .. "Input")
+        local args = input and input:GetText() or ""
+
+        ScriptExtender_Log("Executing UI command: " .. cmdName .. " with args: " .. args)
         local func = getglobal(cmdName)
         if type(func) == "function" then
-            local status, err = pcall(func)
+            local status, err = pcall(func, args)
             if not status then
                 ScriptExtender_Print("Error: " .. tostring(err))
             end

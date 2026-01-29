@@ -1,25 +1,40 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
     <Script file="MacroWindow.lua"/>
 
+    <!-- Template for a single macro row -->
     <Frame name="SE_MacroEntryTemplate" virtual="true">
-        <Size><AbsDimension x="300" y="40"/></Size>
+        <Size><AbsDimension x="400" y="45"/></Size>
         <Layers>
             <Layer level="ARTWORK">
                 <FontString name="$parentName" inherits="GameFontHighlight" justifyH="LEFT" text="Macro Name">
-                    <Size><AbsDimension x="200" y="14"/></Size>
+                    <Size><AbsDimension x="180" y="14"/></Size>
                     <Anchors><Anchor point="TOPLEFT"><Offset><AbsDimension x="5" y="-5"/></Offset></Anchor></Anchors>
                 </FontString>
-                <FontString name="$parentDesc" inherits="GameFontNormalSmall" justifyH="LEFT" text="Description goes here...">
-                    <Size><AbsDimension x="240" y="24"/></Size>
+                <FontString name="$parentDesc" inherits="GameFontNormalSmall" justifyH="LEFT" text="Description...">
+                    <Size><AbsDimension x="380" y="20"/></Size>
                     <Anchors><Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT"><Offset><AbsDimension x="0" y="-2"/></Offset></Anchor></Anchors>
-                    <Color r="0.7" g="0.7" b="0.7"/>
+                    <Color r="0.6" g="0.6" b="0.6"/>
                 </FontString>
             </Layer>
         </Layers>
         <Frames>
+            <!-- Input box for arguments -->
+            <EditBox name="$parentInput" inherits="InputBoxTemplate" autoFocus="false">
+                <Size><AbsDimension x="100" y="20"/></Size>
+                <Anchors>
+                    <Anchor point="RIGHT" relativePoint="RIGHT">
+                        <Offset><AbsDimension x="-60" y="8"/></Offset>
+                    </Anchor>
+                </Anchors>
+                <FontString inherits="ChatFontNormal"/>
+                <Scripts>
+                   <OnLoad>this:SetFrameLevel(this:GetFrameLevel() + 2);</OnLoad>
+                </Scripts>
+            </EditBox>
+            <!-- Run Button -->
             <Button name="$parentRun" inherits="UIPanelButtonTemplate" text="Run">
                 <Size><AbsDimension x="50" y="22"/></Size>
-                <Anchors><Anchor point="RIGHT"><Offset><AbsDimension x="-5" y="0"/></Offset></Anchor></Anchors>
+                <Anchors><Anchor point="RIGHT"><Offset><AbsDimension x="-5" y="8"/></Offset></Anchor></Anchors>
                 <Scripts>
                     <OnClick>SE_MacroEntry_Run(this:GetParent());</OnClick>
                 </Scripts>
@@ -27,8 +42,9 @@
         </Frames>
     </Frame>
 
+    <!-- Template for category headers -->
     <Frame name="SE_CategoryHeaderTemplate" virtual="true">
-        <Size><AbsDimension x="310" y="20"/></Size>
+        <Size><AbsDimension x="400" y="20"/></Size>
         <Layers>
             <Layer level="BACKGROUND">
                <Texture name="$parentBg">
@@ -44,18 +60,22 @@
         </Layers>
     </Frame>
 
+    <!-- Main Window -->
     <Frame name="ScriptExtenderFrame" toplevel="true" enableMouse="true" movable="true" parent="UIParent" hidden="true">
-        <Size><AbsDimension x="350" y="500"/></Size>
+        <Size><AbsDimension x="900" y="450"/></Size> <!-- Wider and Shorter -->
         <Anchors><Anchor point="CENTER"/></Anchors>
+        
         <Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
             <BackgroundInsets><AbsInset left="11" right="12" top="12" bottom="11"/></BackgroundInsets>
             <TileSize><AbsValue val="32"/></TileSize>
             <EdgeSize><AbsValue val="32"/></EdgeSize>
         </Backdrop>
+
         <Layers>
+            <!-- Header Title -->
             <Layer level="ARTWORK">
                 <Texture name="$parentTitleHeader" file="Interface\DialogFrame\UI-DialogBox-Header">
-                    <Size><AbsDimension x="256" y="64"/></Size>
+                    <Size><AbsDimension x="300" y="64"/></Size>
                     <Anchors><Anchor point="TOP"><Offset><AbsDimension x="0" y="12"/></Offset></Anchor></Anchors>
                 </Texture>
                 <FontString name="$parentTitleText" inherits="GameFontNormal" text="Script Extender">
@@ -63,36 +83,90 @@
                 </FontString>
             </Layer>
         </Layers>
+
         <Frames>
+            <!-- Close Button -->
             <Button name="$parentCloseButton" inherits="UIPanelCloseButton">
                 <Anchors><Anchor point="TOPRIGHT"><Offset><AbsDimension x="-5" y="-5"/></Offset></Anchor></Anchors>
             </Button>
             
+            <!-- Debug Toggle -->
             <CheckButton name="SE_DebugCheck" inherits="OptionsCheckButtonTemplate">
                 <Anchors><Anchor point="TOPLEFT"><Offset><AbsDimension x="20" y="-30"/></Offset></Anchor></Anchors>
                 <Scripts>
-                    <OnLoad>getglobal(this:GetName().."Text"):SetText("Enable Debug Logs");</OnLoad>
+                    <OnLoad>getglobal(this:GetName().."Text"):SetText("Enable Logs");</OnLoad>
                     <OnClick>SE_ToggleDebug(this:GetChecked())</OnClick>
                 </Scripts>
             </CheckButton>
 
+            <!-- LEFT COLUMN: Macro Scroll List -->
             <ScrollFrame name="SE_ScrollFrame" inherits="UIPanelScrollFrameTemplate">
-                <Size><AbsDimension x="305" y="380"/></Size>
+                <Size><AbsDimension x="420" y="350"/></Size>
                 <Anchors>
-                    <Anchor point="TOPLEFT"><Offset><AbsDimension x="15" y="-70"/></Offset></Anchor>
+                    <Anchor point="TOPLEFT"><Offset><AbsDimension x="20" y="-70"/></Offset></Anchor>
                 </Anchors>
                 <ScrollChild>
                     <Frame name="SE_ScrollChild">
-                        <Size><AbsDimension x="305" y="380"/></Size>
+                        <Size><AbsDimension x="420" y="350"/></Size>
                     </Frame>
                 </ScrollChild>
             </ScrollFrame>
+
+            <!-- RIGHT COLUMN: Console/Logs -->
+            <!-- Console Background -->
+            <Frame name="SE_ConsoleBg">
+                <Size><AbsDimension x="430" y="350"/></Size>
+                <Anchors>
+                     <Anchor point="TOPLEFT"><Offset><AbsDimension x="450" y="-70"/></Offset></Anchor>
+                </Anchors>
+                <Backdrop bgFile="Interface\Tooltips\UI-Tooltip-Background" edgeFile="Interface\Tooltips\UI-Tooltip-Border" tile="true">
+                    <EdgeSize><AbsValue val="16"/></EdgeSize>
+                    <TileSize><AbsValue val="16"/></TileSize>
+                    <BackgroundInsets><AbsInset left="4" right="4" top="4" bottom="4"/></BackgroundInsets>
+                </Backdrop>
+                <Scripts>
+                    <OnLoad>this:SetBackdropColor(0,0,0,0.8); this:SetBackdropBorderColor(0.6,0.6,0.6,1);</OnLoad>
+                </Scripts>
+                <Frames>
+                    <!-- Console Text - Clear Button -->
+                    <Button name="SE_ClearLogs" inherits="UIPanelButtonTemplate" text="Clear">
+                        <Size><AbsDimension x="50" y="20"/></Size>
+                        <Anchors><Anchor point="TOPRIGHT"><Offset><AbsDimension x="-5" y="-5"/></Offset></Anchor></Anchors>
+                        <Scripts>
+                            <OnClick>if SE_LogFrame then SE_LogFrame:Clear() end</OnClick>
+                        </Scripts>
+                    </Button>
+                </Frames>
+            </Frame>
+
+            <!-- Actual Scrolling Message Frame -->
+            <ScrollingMessageFrame name="SE_LogFrame" fade="false" maxLines="1000">
+                <Size><AbsDimension x="410" y="320"/></Size>
+                <Anchors>
+                    <Anchor point="TOPLEFT" relativeTo="SE_ConsoleBg" relativePoint="TOPLEFT">
+                        <Offset><AbsDimension x="10" y="-25"/></Offset> <!-- below clear button -->
+                    </Anchor>
+                </Anchors>
+                <Scripts>
+                    <OnLoad>
+                        this:SetFading(false);
+                        this:SetFontObject(GameFontHighlightSmallLeft);
+                        this:SetJustifyH("LEFT");
+                    </OnLoad>
+                    <OnHyperlinkClick>
+                        -- Handle unexpected link clicks gracefully
+                    </OnHyperlinkClick>
+                </Scripts>
+            </ScrollingMessageFrame>
+
         </Frames>
         <Scripts>
             <OnLoad>SE_OnLoad();</OnLoad>
             <OnShow>SE_OnShow();</OnShow>
         </Scripts>
     </Frame>
+
+    <!-- Minimap Button (Unchanged) -->
     <Button name="SE_MinimapButton" parent="Minimap" toplevel="true" frameStrata="LOW">
         <Size><AbsDimension x="32" y="32"/></Size>
         <Anchors><Anchor point="TOPLEFT" relativeTo="Minimap" relativePoint="RIGHT"><Offset><AbsDimension x="5" y="0"/></Offset></Anchor></Anchors>

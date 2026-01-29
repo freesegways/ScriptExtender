@@ -22,6 +22,7 @@ ScriptExtender_Coordinator = {
         ScriptExtender_RangeSlotCache.Update()
         ScriptExtender_SpellbookCache.Update()
         ScriptExtender_TalentCache.Update()
+        if ScriptExtender_PetCache then ScriptExtender_PetCache.Update() end
         ScriptExtender_Coordinator.lastCacheUpdate = GetTime()
     end,
 

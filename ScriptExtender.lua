@@ -8,13 +8,17 @@ ScriptExtender_Commands = {}
 -- Global Logging Helper
 function ScriptExtender_Log(msg)
     if ScriptExtender_Debug then
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccff[SE Debug]|r: " .. tostring(msg))
+        local logMsg = "|cff00ccff[SE Debug]|r: " .. tostring(msg)
+        DEFAULT_CHAT_FRAME:AddMessage(logMsg)
+        if SE_LogToUI then SE_LogToUI(logMsg) end
     end
 end
 
 -- Global Helper for important user messages (always shows)
 function ScriptExtender_Print(msg)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ccffScriptExtender|r: " .. tostring(msg))
+    local logMsg = "|cff00ccffScriptExtender|r: " .. tostring(msg)
+    DEFAULT_CHAT_FRAME:AddMessage(logMsg)
+    if SE_LogToUI then SE_LogToUI(logMsg) end
 end
 
 -- Global Error Reporting (Fails Loudly)

@@ -38,3 +38,31 @@ end
 function ScriptExtender_TalentCache.GetRank(name)
     return ScriptExtender_TalentCache.talents[name] or 0
 end
+
+function ScriptExtender_TalentCache.Dump()
+    ScriptExtender_Log("--- Talent Cache ---")
+    local count = 0
+    local keys = {}
+    for k in pairs(ScriptExtender_TalentCache.talents) do table.insert(keys, k) end
+    table.sort(keys)
+
+    for _, name in ipairs(keys) do
+        local rank = ScriptExtender_TalentCache.talents[name]
+        ScriptExtender_Log(string.format("Talent: %s -> Rank: %d", name, rank))
+        count = count + 1
+    end
+    ScriptExtender_Log("Total cached talents: " .. count)
+end
+
+-- Global Wrapper
+function TalentDump()
+    ScriptExtender_TalentCache.Dump()
+end
+
+if ScriptExtender_Register then
+    ScriptExtender_Register({
+        name = "TalentDump",
+        command = "talents",
+        description = "Lists all cached talents"
+    })
+end

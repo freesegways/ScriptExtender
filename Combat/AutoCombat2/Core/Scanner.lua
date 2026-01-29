@@ -331,7 +331,7 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
         groupSize = groupSize,
         inCombat = UnitAffectingCombat("player"),
         target = UnitName("target"),
-        targetPseudoID = ScriptExtender_Scanner.GeneratePseudoID({ unit = "target" })
+        initialTargetPseudoID = ScriptExtender_Scanner.GeneratePseudoID({ unit = "target" })
     }
 
 

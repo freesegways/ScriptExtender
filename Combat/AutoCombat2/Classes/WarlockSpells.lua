@@ -16,7 +16,7 @@ if ScriptExtender_WarlockSpells then return end
 ScriptExtender_WarlockSpells = {
     -- 1. CORRUPTION (DoT)
     ["Corruption"] = {
-        sameRangeAs = "Shadow Bolt",
+        sameRangeAs = "Drain Soul",
         target = "enemy",
         score = function(mob, ws, player)
             if mob.debuffs.hasCC then return 0 end
@@ -39,7 +39,7 @@ ScriptExtender_WarlockSpells = {
 
     -- 2. IMMOLATE (DoT + Direct)
     ["Immolate"] = {
-        sameRangeAs = "Shadow Bolt",
+        sameRangeAs = "Drain Soul",
         target = "enemy",
         score = function(mob, ws, player)
             if mob.debuffs.hasCC then return 0 end
@@ -52,7 +52,7 @@ ScriptExtender_WarlockSpells = {
 
     -- 3. CURSE OF AGONY (DoT)
     ["Curse of Agony"] = {
-        sameRangeAs = "Shadow Bolt",
+        sameRangeAs = "Drain Soul",
         target = "enemy",
         score = function(mob, ws, player)
             if mob.debuffs.hasCC then return 0 end
@@ -74,7 +74,7 @@ ScriptExtender_WarlockSpells = {
 
     -- 4. SIPHON LIFE (DoT / Multi-Target Healing)
     ["Siphon Life"] = {
-        sameRangeAs = "Shadow Bolt",
+        sameRangeAs = "Drain Soul",
         target = "enemy",
         score = function(mob, ws, player)
             if mob.debuffs.hasCC then return 0 end
@@ -101,7 +101,7 @@ ScriptExtender_WarlockSpells = {
 
     -- 5. CURSE OF RECKLESSNESS (Utility/Hybrid)
     ["Curse of Recklessness"] = {
-        sameRangeAs = "Shadow Bolt",
+        sameRangeAs = "Drain Soul",
         target = "enemy",
         score = function(mob, ws, player)
             if mob.debuffs.hasCC then return 0 end
@@ -128,7 +128,7 @@ ScriptExtender_WarlockSpells = {
 
     -- 5. DARK HARVEST (Finisher & DoT Accelerator)
     ["Dark Harvest"] = {
-        sameRangeAs = "Shadow Bolt",
+        sameRangeAs = "Drain Soul",
         target = "enemy",
         score = function(mob, ws, player)
             if mob.debuffs.hasCC then return 0 end
@@ -176,7 +176,7 @@ ScriptExtender_WarlockSpells = {
 
     -- 6. SHADOWBURN (Execute)
     ["Shadowburn"] = {
-        sameRangeAs = "Shadow Bolt",
+        sameRangeAs = "Drain Soul",
         target = "enemy",
         score = function(mob, ws, player)
             if mob.debuffs.hasCC then return 0 end
@@ -192,7 +192,7 @@ ScriptExtender_WarlockSpells = {
 
     -- 7. DRAIN SOUL (Bread and Butter Filler)
     ["Drain Soul"] = {
-        sameRangeAs = "Shadow Bolt",
+        sameRangeAs = "Drain Soul",
         target = "enemy",
         score = function(mob, ws, player)
             if mob.debuffs.hasCC then return 0 end
@@ -219,7 +219,7 @@ ScriptExtender_WarlockSpells = {
 
     -- 8. SHADOW BOLT (Nightfall / Backup Filler)
     ["Shadow Bolt"] = {
-        sameRangeAs = "Shadow Bolt",
+        sameRangeAs = "Drain Soul",
         target = "enemy",
         score = function(mob, ws, player)
             if mob.debuffs.hasCC then return 0 end
@@ -234,7 +234,37 @@ ScriptExtender_WarlockSpells = {
         end
     },
 
-    -- 9. LIFE TAP (Resource)
+    -- 9. DEATH COIL (Panic / Peel)
+    ["Death Coil"] = {
+        target = "enemy",
+        score = function(mob, ws, player)
+            -- Formula: Score = (Pressure - Threshold) * Multiplier
+
+            -- 1. Calculate Pressure
+            local pressure = (100 - player.hpPct)
+
+            -- Add Positional Threat (Melee + Aggro)
+            if mob.target == player.name and mob.rangeBucket == 0 then
+                pressure = pressure + 25
+            end
+
+            -- 2. Apply Threshold (45)
+            if pressure <= 45 then return 0 end
+
+            -- 3. Range Penalty
+            local rangeFactor = 1.0
+            if mob.rangeBucket == 1 then rangeFactor = 0.5 end -- ~10y (Middle ground)
+            if mob.rangeBucket == 2 then rangeFactor = 0.1 end -- ~20y (Rare)
+            if mob.rangeBucket == 3 then rangeFactor = 0.0 end -- >30y (Never)
+
+            if rangeFactor == 0 then return 0 end
+
+            -- 4. Apply Multiplier
+            return (pressure - 45) * 6 * rangeFactor
+        end
+    },
+
+    -- 10. LIFE TAP (Resource)
     ["Life Tap"] = {
         target = "player",
         score = function(mob, ws, player)

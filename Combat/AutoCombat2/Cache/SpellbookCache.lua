@@ -56,5 +56,60 @@ ScriptExtender_SpellbookCache = {
         local rankData = entry.ranks[rank]
         if rankData then return rankData.id end
         return nil
+    end,
+
+    HasSpell = function(name)
+        return ScriptExtender_SpellbookCache.spells[name] ~= nil
+    end,
+
+    -- Check Cooldown and Usability (Logic moved here from Analyzer)
+    IsReady = function(name)
+        local entry = ScriptExtender_SpellbookCache.spells[name]
+        if not entry then return false end
+
+        -- 1. Check Cooldown
+        local spellID = ScriptExtender_SpellbookCache.GetSpellID(name)
+        if not spellID then return false end
+
+        local start, duration = GetSpellCooldown(spellID, BOOKTYPE_SPELL)
+        if start > 0 and duration > 1.5 then return false end
+
+        -- 2. Check Usable Action (Range/Mana/Stance) IF it is on action bar
+        -- Note: IsUsableSpell(spellName) exists in API but IsUsableAction(slot) covers more cases
+        -- We will check Slot usability if we have it mapped.
+        local slot = ScriptExtender_RangeSlotCache.GetSlot(name)
+        if slot then
+            if not IsUsableAction(slot) then return false end
+        end
+
+        return true
+    end,
+
+    Dump = function()
+        ScriptExtender_Log("--- Spellbook Cache ---")
+        local count = 0
+        local keys = {}
+        for k in pairs(ScriptExtender_SpellbookCache.spells) do table.insert(keys, k) end
+        table.sort(keys)
+
+        for _, name in ipairs(keys) do
+            local entry = ScriptExtender_SpellbookCache.spells[name]
+            ScriptExtender_Log(string.format("Spell: %s (MaxRank: %d)", name, entry.maxRank or 0))
+            count = count + 1
+        end
+        ScriptExtender_Log("Total cached spells: " .. count)
     end
 }
+
+-- Global Wrapper
+function SpellDump()
+    ScriptExtender_SpellbookCache.Dump()
+end
+
+if ScriptExtender_Register then
+    ScriptExtender_Register({
+        name = "SpellDump",
+        command = "spells",
+        description = "Lists all cached spellbook spells"
+    })
+end
