@@ -338,66 +338,74 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
     ---@type table<string, MobData>
     local mobAccumulator = {}
 
-    -- 2. Discovery Strategy
-    if UnitExists("target") and not UnitAffectingCombat("target") and UnitCanAttack("player", "target") then
-        ws.context.pullMode = true
-        local mob = GetRawMobData("target")
-        if mob then
-            local discoveryKey = mob.name .. "_" .. mob.level .. "_" .. mob.maxHP
+    -- Identifies and adds a mob to the accumulator
+    local function AddMobToAccumulator(unit)
+        local mob = GetRawMobData(unit)
+        if not mob then return nil end
+
+        -- CAPTURE identity immediately while unit exists
+        mob.pseudoID = ScriptExtender_Scanner.GeneratePseudoID({ unit = unit })
+
+        -- Use a stable discovery key for deduplication ONLY
+        local discoveryKey = mob.name .. "_" .. mob.level .. "_" .. mob.maxHP
+        if not mobAccumulator[discoveryKey] then
             mobAccumulator[discoveryKey] = mob
-            ScriptExtender_Log("Scanner: Pull Mode active. Focusing on " .. (mob.name or "Target"))
+            return true
         end
-    else
+        return false
+    end
+
+    -- 2. Discovery Strategy
+    -- ALWAYS add current target first
+    if UnitExists("target") and UnitCanAttack("player", "target") then
+        local targetID = ScriptExtender_Scanner.GeneratePseudoID({ unit = "target" })
+        ws.context.initialTargetPseudoID = targetID
+        AddMobToAccumulator("target")
+
+        if not UnitAffectingCombat("target") then
+            ws.context.pullMode = true
+            ScriptExtender_Log("Scanner: Pull Mode active. Monitoring potential pull.")
+        end
+    end
+
+    if not ws.context.pullMode then
         local firstSeenKey = nil
         for i = 1, 26 do
             TargetNearestEnemy()
             local mob = GetRawMobData("target")
             if mob then
-                local discoveryKey = mob.name .. "_" .. mob.level .. "_" .. mob.maxHP
-                if firstSeenKey and discoveryKey == firstSeenKey then break end
-                if not firstSeenKey then firstSeenKey = discoveryKey end
+                local dKey = mob.name .. "_" .. mob.level .. "_" .. mob.maxHP
+                if firstSeenKey and dKey == firstSeenKey then break end
+                if not firstSeenKey then firstSeenKey = dKey end
 
-                -- Point 2.2: Global discovery (OOC is fine to scan)
-                if not mobAccumulator[discoveryKey] then
-                    mobAccumulator[discoveryKey] = mob
-                end
+                AddMobToAccumulator("target")
             else
                 break
             end
         end
     end
 
-    -- 3. Party Targets & Group Awareness
+    -- 3. Party Targets
     ws.aggregations = { mobCount = 0, attackersOnPlayer = 0, classCounts = {} }
-
     local friends = { "player", "party1", "party2", "party3", "party4" }
     for _, friend in ipairs(friends) do
         if UnitExists(friend) then
-            -- Count Classes for Debuff reconciliation
             local _, class = UnitClass(friend)
             local classKey = string.upper(class or "")
             ws.aggregations.classCounts[classKey] = (ws.aggregations.classCounts[classKey] or 0) + 1
-
-            -- Scan Party Targets
-            if friend ~= "player" then
-                local unit = friend .. "target"
-                local mob = GetRawMobData(unit)
-                if mob then
-                    local dKey = mob.name .. "_" .. mob.level .. "_" .. mob.maxHP
-                    if not mobAccumulator[dKey] then
-                        mobAccumulator[dKey] = mob
-                    end
-                end
-            end
+            if friend ~= "player" then AddMobToAccumulator(friend .. "target") end
         end
     end
 
-    -- 4. Aggregate TargetedBy
+    -- 4. Finalize & targetedByCount
     for _, friend in ipairs(friends) do
         if UnitExists(friend) then
             local t = friend .. "target"
             if UnitExists(t) then
-                local dKey = UnitName(t) .. "_" .. UnitLevel(t) .. "_" .. UnitHealthMax(t)
+                local name = UnitName(t)
+                local level = UnitLevel(t)
+                local hpMax = UnitHealthMax(t)
+                local dKey = name .. "_" .. level .. "_" .. hpMax
                 if mobAccumulator[dKey] then
                     mobAccumulator[dKey].targetedByCount = mobAccumulator[dKey].targetedByCount + 1
                 end
@@ -405,40 +413,21 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
         end
     end
 
-    -- 5. Finalize PseudoIDs, Toughness & Reconcile Debuffs
+    -- 5. Finalize List
     local finalMobs = {}
     local pMaxHP = ws.context.playerMaxHP or 1
     local gSize = ws.context.groupSize or 1
     local pLevel = ws.context.playerLevel or 60
 
     for _, mob in pairs(mobAccumulator) do
-        -- TOUGHNESS HEURISTIC:
-        -- 1.0 = About as tough as the player.
-        -- 5.0 = Dungeon Elite.
-        -- 20.0+ = Raid Boss.
-        local gPower = 1 + (gSize - 1) * 0.25 -- Group power scaling
-        -- toughness is current hp over p max hp times group power
+        local gPower = 1 + (gSize - 1) * 0.25
         mob.toughness = mob.hp / (pMaxHP * gPower)
-
-        -- Level Adjustment (Higher level mobs are tougher)
         local levelDiff = mob.level - pLevel
-        if levelDiff > 0 then
-            mob.toughness = mob.toughness * (1 + (levelDiff * 0.1))
-        end
+        if levelDiff > 0 then mob.toughness = mob.toughness * (1 + (levelDiff * 0.1)) end
 
-        mob.pseudoID = ScriptExtender_Scanner.GeneratePseudoID({
-            unit = mob.unit,
-            targetedByCount = mob.targetedByCount,
-            debuffHash = mob.debuffs.hash
-        })
-
-        -- Reconciliation Logic
         mob.myDebuffs = ReconcileDebuffs(mob, ws)
-
-        -- Target Identification
         mob.isTarget = (mob.pseudoID == ws.context.initialTargetPseudoID)
 
-        -- Clear mobs that are OOC unless we are in pull mode
         if ws.context.pullMode or mob.inCombat then
             finalMobs[mob.pseudoID] = mob
             ws.aggregations.mobCount = ws.aggregations.mobCount + 1

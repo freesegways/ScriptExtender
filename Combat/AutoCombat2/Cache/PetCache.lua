@@ -32,18 +32,9 @@ ScriptExtender_PetCache = {
 
     -- Check range for pet actions
     InRange = function(spellName)
-        -- Basic commands are always "in range" (starts the movement/action)
-        if spellName == "PetAttack" or spellName == "PetFollow" or
-            spellName == "PetStay" or spellName == "PetPassive" or
-            spellName == "PetDefensive" then
-            return true
-        end
-
-        local slot = ScriptExtender_PetCache.actions[spellName]
-        if not slot then return nil end
-
-        -- IsPetActionInRange returns 1 (true), 0 (false), nil (invalid)
-        return IsPetActionInRange(slot) == 1
+        -- 1.12.1 engine does not have IsPetActionInRange.
+        -- We return true and let the pet's native AI handle moving into range.
+        return true
     end,
 
     -- Unified Pet Action Dispatcher

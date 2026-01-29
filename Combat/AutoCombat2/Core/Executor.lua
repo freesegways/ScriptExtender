@@ -65,6 +65,9 @@ ScriptExtender_Executor = {
             ScriptExtender_Log("Executor: Pull Mode active. Restricting loop to current target.")
         end
 
+        if MAX_STEPS > 1 then
+            ClearTarget()
+        end
         for i = 1, MAX_STEPS do
             if i > 1 then TargetNearestEnemy() end
             steps = i
@@ -164,6 +167,7 @@ ScriptExtender_Executor = {
             ScriptExtender_Log("Executor: Casting " .. spellName .. " on " .. (UnitName("target") or "Me"))
             CastSpell(spellID, BOOKTYPE_SPELL)
 
+            -- Ledger tracking
             local _, class = UnitClass("player")
             local classKey = string.upper(class or "")
             if ScriptExtender_ClassDebuffs and ScriptExtender_ClassDebuffs[classKey] then
@@ -173,10 +177,12 @@ ScriptExtender_Executor = {
                     local tID = action.target
                     if not ledger[tID] then ledger[tID] = {} end
                     ledger[tID][spellName] = GetTime() + meta.duration
-                    ScriptExtender_Log("Executor: Registered " .. spellName .. " in ledger for " .. tID)
                 end
             end
             return true
+        else
+            ScriptExtender_Error("Executor: Spell lookup failed for '" ..
+                tostring(spellName) .. "'. Not in SpellbookCache?")
         end
         return false
     end
