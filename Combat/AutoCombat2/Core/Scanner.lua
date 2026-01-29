@@ -386,7 +386,7 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
     end
 
     -- 3. Party Targets
-    ws.aggregations = { mobCount = 0, attackersOnPlayer = 0, classCounts = {} }
+    ws.aggregations = { mobCount = 0, attackersOnPlayer = 0, aggregateToughness = 0, classCounts = {} }
     local friends = { "player", "party1", "party2", "party3", "party4" }
     for _, friend in ipairs(friends) do
         if UnitExists(friend) then
@@ -431,6 +431,7 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
         if ws.context.pullMode or mob.inCombat then
             finalMobs[mob.pseudoID] = mob
             ws.aggregations.mobCount = ws.aggregations.mobCount + 1
+            ws.aggregations.aggregateToughness = ws.aggregations.aggregateToughness + (mob.toughness or 0)
             if mob.target == UnitName("player") then
                 ws.aggregations.attackersOnPlayer = ws.aggregations.attackersOnPlayer + 1
             end

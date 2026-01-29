@@ -28,9 +28,19 @@ ScriptExtender_WarlockSpells = {
                 score = score + 30
             end
 
-            -- Multi-Target Bonus: Prioritize spreading Corruption if many mobs exist
+            -- Health Scaling: Reduce score on dying mobs
+            if mob.hpPct < 30 then
+                score = score - (30 - mob.hpPct)
+            end
+
+            -- Multi-Target Bonus: Strongly prioritize spreading Corruption if 2+ mobs exist
+            -- Scale with threat: Don't spread too aggressively on tiny trash
             if ws.aggregations.mobCount > 1 then
-                score = score + (ws.aggregations.mobCount * 5)
+                local aggTough = ws.aggregations.aggregateToughness or 0
+                local threatBonus = 25
+                if aggTough < 2.5 then threatBonus = 10 end -- Reduce for weaklings
+
+                score = score + threatBonus + (ws.aggregations.mobCount * 10)
             end
 
             return score
@@ -44,9 +54,15 @@ ScriptExtender_WarlockSpells = {
         score = function(mob, ws, player)
             if mob.debuffs.hasCC then return 0 end
             if mob.myDebuffs["Immolate"] then return 0 end
-            if mob.hpPct < 30 then return 10 end
 
-            return 50
+            -- Waste threshold: Don't cast on dying mobs
+            if mob.hpPct < 25 and mob.classification == "normal" then return 0 end
+            if mob.hpPct < 10 then return 0 end
+
+            local score = 50
+            if mob.hpPct < 40 then score = 25 end -- Reduce priority as it nears death
+
+            return score
         end
     },
 
@@ -63,9 +79,9 @@ ScriptExtender_WarlockSpells = {
             local score = 65
             if mob.classification == "elite" then score = score + 20 end
 
-            -- Multi-Target Bonus: Agony is great for rot pressure
+            -- Multi-Target Bonus: Agony is essential for rot pressure on 2+ targets
             if ws.aggregations.mobCount > 1 then
-                score = score + (ws.aggregations.mobCount * 5)
+                score = score + 25 + (ws.aggregations.mobCount * 10)
             end
 
             return score
@@ -81,9 +97,12 @@ ScriptExtender_WarlockSpells = {
             if not ScriptExtender_TalentCache.HasTalent("Siphon Life") then return 0 end
             if mob.myDebuffs["Siphon Life"] then return 0 end
 
-            -- Scoring: Great for long fights (Toughness > 2)
+            -- Scoring: Great for long fights (Toughness > 3)
+            -- Or if we are in a high-threat pack (Aggregate > 5)
             local score = 55
-            if mob.toughness > 3 or mob.classification == "elite" then
+            local aggTough = ws.aggregations.aggregateToughness or 0
+
+            if mob.toughness > 3 or mob.classification == "elite" or aggTough > 5 then
                 score = score + 20
             end
 
@@ -92,7 +111,7 @@ ScriptExtender_WarlockSpells = {
 
             -- Multi-Target Bonus: More Siphons = More Healing
             if ws.aggregations.mobCount > 1 then
-                score = score + (ws.aggregations.mobCount * 8) -- Higher bonus as it heals too
+                score = score + 15 + (ws.aggregations.mobCount * 5)
             end
 
             return score
@@ -197,23 +216,32 @@ ScriptExtender_WarlockSpells = {
         score = function(mob, ws, player)
             if mob.debuffs.hasCC then return 0 end
 
-            -- If we need shards, this is top priority
-            if mob.hpPct < 20 and ws.context.playerShards < 5 then
-                return 90
+            -- 1. Soul Shard Priority (High)
+            if mob.hpPct < 25 and ws.context.playerShards < 5 then
+                return 100 -- MUST HAVE SHARDS
             end
 
-            -- Bread and Butter: After DoTs are applied, we Drain.
-            -- This beats Shadow Bolt (30) as a default filler.
+            -- 2. Execution / High Value Filler
             if mob.myDebuffs["Corruption"] then
-                local fillerScore = 45
+                local score = 45
                 if mob.myDebuffs["Curse of Agony"] or mob.myDebuffs["Siphon Life"] then
-                    fillerScore = 55
+                    score = score + 10
                 end
-                return fillerScore
+
+                -- Health Scaling: Prioritize dying mobs for execution efficiency
+                -- Gives +1 to +30 points based on missing health
+                score = score + ((100 - mob.hpPct) / 3)
+
+                -- Penalty for Full HP mobs to avoid "Early Draining"
+                if mob.hpPct > 90 then score = score - 30 end
+
+                return score
             end
 
-            -- Default low priority
-            return 10
+            -- 3. Last Resort Filler
+            local p = 10
+            if mob.hpPct < 40 then p = p + 10 end
+            return p
         end
     },
 
