@@ -47,7 +47,8 @@ ScriptExtender_Analyzer = {
                                 end
                             end
 
-                            local inRange = ScriptExtender_RangeSlotCache.InRange(spellName, mob.unit)
+                            local inRange = isPetSpell and ScriptExtender_PetCache.InRange(spellName) or
+                            ScriptExtender_RangeSlotCache.InRange(spellName, mob.unit)
 
                             if inRange and ready then
                                 local context = casterState

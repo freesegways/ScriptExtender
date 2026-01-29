@@ -30,6 +30,65 @@ ScriptExtender_PetCache = {
         return (start == 0 or duration <= 1.5)
     end,
 
+    -- Check range for pet actions
+    InRange = function(spellName)
+        -- Basic commands are always "in range" (starts the movement/action)
+        if spellName == "PetAttack" or spellName == "PetFollow" or
+            spellName == "PetStay" or spellName == "PetPassive" or
+            spellName == "PetDefensive" then
+            return true
+        end
+
+        local slot = ScriptExtender_PetCache.actions[spellName]
+        if not slot then return nil end
+
+        -- IsPetActionInRange returns 1 (true), 0 (false), nil (invalid)
+        return IsPetActionInRange(slot) == 1
+    end,
+
+    -- Unified Pet Action Dispatcher
+    Cast = function(spellName, skipRangeCheck)
+        if not UnitExists("pet") or UnitIsDead("pet") then return false end
+
+        -- 1. Standard API Commands
+        -- These ALWAYS skip range checks (PetAttack starts the run to target)
+        local isCommand = false
+        if spellName == "PetAttack" then
+            PetAttack()
+            isCommand = true
+        elseif spellName == "PetFollow" then
+            PetFollow()
+            isCommand = true
+        elseif spellName == "PetStay" then
+            PetStay()
+            isCommand = true
+        elseif spellName == "PetPassive" then
+            PetPassiveMode()
+            isCommand = true
+        elseif spellName == "PetDefensive" then
+            PetDefensiveMode()
+            isCommand = true
+        end
+
+        if isCommand then return true end
+
+        -- 2. Action Bar Spells
+        local slot = ScriptExtender_PetCache.actions[spellName]
+        if slot then
+            -- Check range unless explicitly told to skip
+            if not skipRangeCheck then
+                if ScriptExtender_PetCache.InRange(spellName) == false then
+                    return false -- Out of Range
+                end
+            end
+
+            CastPetAction(slot)
+            return true
+        end
+
+        return false
+    end,
+
     Dump = function()
         ScriptExtender_Log("--- Pet Cache ---")
         local count = 0

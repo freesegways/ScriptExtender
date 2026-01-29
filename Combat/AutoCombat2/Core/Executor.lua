@@ -152,14 +152,10 @@ ScriptExtender_Executor = {
 
         -- Pet Spell? (Implicit execution via API usually, but standardized here)
         if action.source == "pet" then
-            if spellName == "PetAttack" then
-                PetAttack()
-            elseif spellName == "PetFollow" then
-                PetFollow()
-            else
-                CastSpellByName(spellName)
+            if ScriptExtender_PetCache then
+                return ScriptExtender_PetCache.Cast(spellName)
             end
-            return true
+            return false
         end
 
         -- Player Spell
