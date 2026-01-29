@@ -27,6 +27,12 @@ ScriptExtender_WarlockSpells = {
             if mob.classification == "elite" or mob.classification == "worldboss" then
                 score = score + 30
             end
+
+            -- Multi-Target Bonus: Prioritize spreading Corruption if many mobs exist
+            if ws.aggregations.mobCount > 1 then
+                score = score + (ws.aggregations.mobCount * 5)
+            end
+
             return score
         end
     },
@@ -56,6 +62,12 @@ ScriptExtender_WarlockSpells = {
 
             local score = 65
             if mob.classification == "elite" then score = score + 20 end
+
+            -- Multi-Target Bonus: Agony is great for rot pressure
+            if ws.aggregations.mobCount > 1 then
+                score = score + (ws.aggregations.mobCount * 5)
+            end
+
             return score
         end
     },
@@ -77,6 +89,11 @@ ScriptExtender_WarlockSpells = {
 
             -- Lower priority if the mob is about to die
             if mob.hpPct < 25 and mob.classification == "normal" then return 0 end
+
+            -- Multi-Target Bonus: More Siphons = More Healing
+            if ws.aggregations.mobCount > 1 then
+                score = score + (ws.aggregations.mobCount * 8) -- Higher bonus as it heals too
+            end
 
             return score
         end

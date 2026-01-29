@@ -15,19 +15,24 @@ ScriptExtender_WarlockPetSpells = {
 
             local score = 0
 
-            -- 1. Focus Fire: Attack Player's Target
-            if ws.context.targetPseudoID == mob.pseudoID then
-                score = 100
+            -- 1. Focus Fire: Attack Player's Target (Absolute Priority)
+            if mob.isTarget then
+                score = 500
             end
 
             -- 2. Defend Player: If mob is attacking player, increase priority
             if mob.target == UnitName("player") then
-                score = score + 50 -- Heavy weight to peel aggro
+                score = score + 100 -- Heavy weight to peel aggro
             end
 
             -- 3. Avoid Runners (Risk of body pull)
             if mob.isFleeing then
-                score = score - 60
+                score = score - 150
+            end
+
+            -- 4. Aggressive Engagement: If pet is idle but player is in combat
+            if not pet.inCombat and ws.context.inCombat then
+                score = score + 200
             end
 
             return score
@@ -71,6 +76,7 @@ ScriptExtender_WarlockPetSpells = {
         target = "pet_enemy",
         score = function(mob, ws, pet)
             if mob.debuffs.hasCC then return 0 end
+            if not pet.inCombat then return 0 end -- Must be in melee range (assumed by combat)
             if pet.manaPct > 20 then return 60 end
             return 0
         end,
@@ -100,7 +106,7 @@ ScriptExtender_WarlockPetSpells = {
             end
 
             -- Prioritize current target slightly more to prevent switching mid-cast
-            if ws.context.targetPseudoID == mob.pseudoID then
+            if mob.isTarget then
                 score = score + 10
             end
 

@@ -35,6 +35,7 @@ ScriptExtender_Scanner = {
 ---@field isFleeing boolean Heuristic for fleeing mobs
 ---@field toughness number Calculated threat/strength rating
 ---@field pseudoID string | nil  Unique identifier for tracking
+---@field isTarget boolean Whether the mob is the player's current target
 ---@field myDebuffs table Map of debuffs applied by the player [SpellName]=true
 
 -- Private Helper: Calculate Buckets
@@ -209,17 +210,17 @@ function ScriptExtender_Scanner.GeneratePseudoID(params)
     end
 
     local pseudoID = string.format(
-        "%s_%d_%d_%s_%s_%s_%d_%d_%s_%d_%s",
+        "%s_%d_%d_%s_%s_%s_%d_%s_%s",
         name or "Unknown",
         maxHP or 0,
         level or 0,
         cType or "Unknown",
         classif or "normal",
         target,
-        targetedBy,
+        -- targetedBy,
         raidIcon,
         tostring(isCasting),
-        debuffHash,
+        -- debuffHash,
         tostring(inCombat or false)
     )
     return pseudoID
@@ -254,7 +255,8 @@ local function GetRawMobData(unit)
         inCombat = UnitAffectingCombat(unit),
         isCasting = nil,
         target = UnitName(unit .. "target"),
-        targetedByCount = 0
+        targetedByCount = 0,
+        isTarget = false
     }
 
     if UnitCastingInfo then
@@ -433,10 +435,16 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
         -- Reconciliation Logic
         mob.myDebuffs = ReconcileDebuffs(mob, ws)
 
-        finalMobs[mob.pseudoID] = mob
-        ws.aggregations.mobCount = ws.aggregations.mobCount + 1
-        if mob.target == UnitName("player") then
-            ws.aggregations.attackersOnPlayer = ws.aggregations.attackersOnPlayer + 1
+        -- Target Identification
+        mob.isTarget = (mob.pseudoID == ws.context.targetPseudoID)
+
+        -- Clear mobs that are OOC unless we are in pull mode
+        if ws.context.pullMode or mob.inCombat then
+            finalMobs[mob.pseudoID] = mob
+            ws.aggregations.mobCount = ws.aggregations.mobCount + 1
+            if mob.target == UnitName("player") then
+                ws.aggregations.attackersOnPlayer = ws.aggregations.attackersOnPlayer + 1
+            end
         end
     end
     ws.mobs = finalMobs

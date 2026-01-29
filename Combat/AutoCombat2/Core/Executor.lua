@@ -56,6 +56,7 @@ ScriptExtender_Executor = {
         -- Loop Variables
         local startID = initialID
         local steps = 0
+        local seenIDs = {}
         local MAX_STEPS = 26
 
         -- If Pull Mode is active, we do NOT cycle. We only check the current target.
@@ -66,8 +67,13 @@ ScriptExtender_Executor = {
 
         for i = 1, MAX_STEPS do
             if i > 1 then TargetNearestEnemy() end
+            steps = i
 
             local currentID = ScriptExtender_Scanner.GeneratePseudoID({ unit = "target" })
+            if currentID and not seenIDs[currentID] then
+                seenIDs[currentID] = true
+            end
+
             local isOOC = not UnitAffectingCombat("target")
 
             -- Valid Target Logic
@@ -81,7 +87,7 @@ ScriptExtender_Executor = {
 
             -- Pull Mode Override: Trust the target even if ID drifted
             if ws.context.pullMode and targetExists then
-                currentID = bestPlayerAction and bestPlayerAction.target or (bestPetAction and bestPetAction.target)
+                currentID = (bestPlayerAction and bestPlayerAction.target) or (bestPetAction and bestPetAction.target)
                 validTarget = true
             end
 
@@ -109,6 +115,32 @@ ScriptExtender_Executor = {
             -- Full Circle Check
             if i > 1 and startID and currentID == startID then break end
             if not startID and currentID then startID = currentID end
+        end
+
+        if not actionExecuted and (bestPlayerAction or bestPetAction) then
+            local missing = {}
+            local expected = {}
+            if bestPlayerAction then
+                table.insert(missing, bestPlayerAction.action)
+                table.insert(expected, bestPlayerAction.target)
+            end
+            if bestPetAction then
+                table.insert(missing, "(Pet) " .. bestPetAction.action)
+                table.insert(expected, bestPetAction.target)
+            end
+
+            local foundStr = ""
+            for id, _ in pairs(seenIDs) do
+                foundStr = foundStr .. "\n - " .. id
+            end
+
+            ScriptExtender_Error(string.format(
+                "Executor: No action executed!\nTarget References: %s\nActions Attempted: %s\nActual IDs Found:%s\nTabs Count: %d",
+                table.concat(expected, ", "),
+                table.concat(missing, ", "),
+                foundStr,
+                steps
+            ))
         end
 
         return actionExecuted
