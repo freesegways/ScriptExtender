@@ -436,7 +436,7 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
         mob.myDebuffs = ReconcileDebuffs(mob, ws)
 
         -- Target Identification
-        mob.isTarget = (mob.pseudoID == ws.context.targetPseudoID)
+        mob.isTarget = (mob.pseudoID == ws.context.initialTargetPseudoID)
 
         -- Clear mobs that are OOC unless we are in pull mode
         if ws.context.pullMode or mob.inCombat then
