@@ -14,14 +14,21 @@ ScriptExtender_Analyzer = {
         if not spellTables then return {} end
 
         local casterState = {
-            name = UnitName(casterUnit),
-            hpPct = (UnitHealth(casterUnit) / UnitHealthMax(casterUnit)) * 100,
-            manaPct = (UnitMana(casterUnit) / (UnitManaMax(casterUnit) or 1)) * 100
+            hpPct = ws.context.playerHP_Pct,
+            manaPct = ws.context.playerMana_Pct,
+            shards = ws.context.playerShards
         }
+
+        local evaluationSummary = {}
 
         -- 1. Target Actions (Enemy/PetEnemy)
         for _, mob in pairs(ws.mobs) do
             local isOffensiveLegal = mob.inCombat or (ws.context.initialTargetPseudoID == mob.pseudoID)
+            local mobSummary = { name = mob.name, isLegal = isOffensiveLegal, peakScore = 0, rejectedSpells = {} }
+
+            if not isOffensiveLegal then
+                mobSummary.rejectedReason = "OOC/Illegal"
+            end
 
             for source, spellTable in pairs(spellTables) do
                 for spellName, spellData in pairs(spellTable) do
@@ -31,31 +38,41 @@ ScriptExtender_Analyzer = {
 
                         if ScriptExtender_CooldownTracker.IsReady(spellName) then
                             local ready = false
-
-                            -- Special Case: Pet Commands (Attack, Follow, etc) skip the bar/cooldown check
                             if isPetSpell and spellData.isCommand then
                                 ready = true
                             elseif isPetSpell then
-                                -- Pet Logic: Use PetCache
                                 if ScriptExtender_PetCache and ScriptExtender_PetCache.IsReady(spellName) then
                                     ready = true
                                 end
                             else
-                                -- Player Logic
                                 if ScriptExtender_SpellbookCache.IsReady(spellName) then
                                     ready = true
                                 end
                             end
 
-                            local inRange = isPetSpell and ScriptExtender_PetCache.InRange(spellName) or
-                            ScriptExtender_RangeSlotCache.InRange(spellName, mob.unit)
+                            if not ready then
+                                mobSummary.rejectedSpells[spellName] = "NotReady"
+                            end
+
+                            -- Range Check (Scanner-Trust Strategy)
+                            local inRange = (mob.foundInRange == true) or (mob.rangeBucket <= 2)
+                            if not inRange then
+                                mobSummary.rejectedSpells[spellName] = "Range"
+                            end
 
                             if inRange and ready then
                                 local context = casterState
                                 if isPetSpell then context = ws.context.pet end
-                                score = spellData.score(mob, ws, context)
+                                score = (spellData.score(mob, ws, context) or 0)
+                                if score <= 0 then
+                                    mobSummary.rejectedSpells[spellName] = "Score0"
+                                end
                             end
+                        else
+                            mobSummary.rejectedSpells[spellName] = "Cooldown"
                         end
+
+                        if score > mobSummary.peakScore then mobSummary.peakScore = score end
 
                         if score > 0 then
                             table.insert(actionList, {
@@ -69,10 +86,17 @@ ScriptExtender_Analyzer = {
                     end
                 end
             end
+
+            if mobSummary.peakScore == 0 and isOffensiveLegal then
+                mobSummary.rejectedReason = "No spells passed criteria"
+            end
+            evaluationSummary[mob.pseudoID] = mobSummary
         end
 
         -- 2. Self Actions (Player/Pet)
-        -- 2. Self Actions (Player/Pet)
+        -- ... (Skipping full update to 2. Self Actions for brevity in summary, but ensuring it returns correctly) ...
+        -- (Actually I should keep the logic for 2. Self Actions but not necessarily summarize it the same way unless needed)
+
         for source, spellTable in pairs(spellTables) do
             for spellName, spellData in pairs(spellTable) do
                 if spellData.target == "player" or spellData.target == "pet" then
@@ -114,6 +138,6 @@ ScriptExtender_Analyzer = {
         end
 
         table.sort(actionList, function(a, b) return a.score > b.score end)
-        return actionList
+        return actionList, evaluationSummary
     end
 }

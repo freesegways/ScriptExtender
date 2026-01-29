@@ -54,70 +54,69 @@ ScriptExtender_Executor = {
         end
 
         -- Loop Variables
-        local startID = initialID
-        local steps = 0
+        local startID = nil
         local seenIDs = {}
-        local MAX_STEPS = 26
+        local steps = 0
+        local MAX_STEPS = 12
 
-        -- If Pull Mode is active, we do NOT cycle. We only check the current target.
-        if ws.context.pullMode and targetExists then
-            MAX_STEPS = 1
-            ScriptExtender_Log("Executor: Pull Mode active. Restricting loop to current target.")
+        -- 1. Check current target FIRST (Efficiency & Reliability)
+        if targetExists then
+            local currentID = ScriptExtender_Scanner.GeneratePseudoID({ unit = "target" })
+            if currentID then
+                startID = currentID
+                seenIDs[currentID] = true
+
+                -- Try to execute immediately
+                if bestPlayerAction and ScriptExtender_Scanner.IsIDCompatible(bestPlayerAction.target, currentID) then
+                    if ScriptExtender_Executor.AttemptCast(bestPlayerAction, ws) then
+                        actionExecuted = true
+                        bestPlayerAction = nil
+                    end
+                end
+                if bestPetAction and ScriptExtender_Scanner.IsIDCompatible(bestPetAction.target, currentID) then
+                    if ScriptExtender_Executor.AttemptCast(bestPetAction, ws) then
+                        actionExecuted = true
+                        bestPetAction = nil
+                    end
+                end
+            end
         end
 
-        if MAX_STEPS > 1 then
-            ClearTarget()
-        end
+        if not bestPlayerAction and not bestPetAction then return true end
+
+        -- 2. Tab-Cycling Engine
         for i = 1, MAX_STEPS do
-            if i > 1 then TargetNearestEnemy() end
+            TargetNearestEnemy()
             steps = i
 
             local currentID = ScriptExtender_Scanner.GeneratePseudoID({ unit = "target" })
-            if currentID and not seenIDs[currentID] then
+            if not currentID then break end
+
+            -- Exit Condition: Strict Full Circle Check
+            -- We only stop if we hit the EXACT same string ID we started on.
+            if startID and currentID == startID then break end
+            if not startID then startID = currentID end
+
+            if not seenIDs[currentID] then
                 seenIDs[currentID] = true
-            end
 
-            local isOOC = not UnitAffectingCombat("target")
-
-            -- Valid Target Logic
-            local validTarget = false
-            if currentID then validTarget = true end
-
-            -- Skip OOC (unless Pull Mode, but Pull Mode max_steps=1 handles that implicitly by not cycling)
-            if not ws.context.pullMode and isOOC then
-                validTarget = false
-            end
-
-            -- Pull Mode Override: Trust the target even if ID drifted
-            if ws.context.pullMode and targetExists then
-                currentID = (bestPlayerAction and bestPlayerAction.target) or (bestPetAction and bestPetAction.target)
-                validTarget = true
-            end
-
-            if validTarget then
-                -- Check Player Action
-                if bestPlayerAction and bestPlayerAction.target == currentID then
+                -- Action Matching: Use Compatible matching to handle target shifts
+                if bestPlayerAction and ScriptExtender_Scanner.IsIDCompatible(bestPlayerAction.target, currentID) then
                     if ScriptExtender_Executor.AttemptCast(bestPlayerAction, ws) then
                         actionExecuted = true
-                        bestPlayerAction = nil -- Done
+                        bestPlayerAction = nil
                     end
                 end
 
-                -- Check Pet Action
-                if bestPetAction and bestPetAction.target == currentID then
+                if bestPetAction and ScriptExtender_Scanner.IsIDCompatible(bestPetAction.target, currentID) then
                     if ScriptExtender_Executor.AttemptCast(bestPetAction, ws) then
                         actionExecuted = true
-                        bestPetAction = nil -- Done
+                        bestPetAction = nil
                     end
                 end
+
+                if not bestPlayerAction and not bestPetAction then break end
             end
-
-            -- Exit Conditions
-            if not bestPlayerAction and not bestPetAction then break end -- All done
-
-            -- Full Circle Check
-            if i > 1 and startID and currentID == startID then break end
-            if not startID and currentID then startID = currentID end
         end
 
         if not actionExecuted and (bestPlayerAction or bestPetAction) then

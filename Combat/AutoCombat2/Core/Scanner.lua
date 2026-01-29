@@ -210,20 +210,46 @@ function ScriptExtender_Scanner.GeneratePseudoID(params)
     end
 
     local pseudoID = string.format(
-        "%s_%d_%d_%s_%s_%s_%d_%s_%s",
+        "%s_%d_%d_%s_%d_%s", -- Removed target (volatile)
         name or "Unknown",
         maxHP or 0,
         level or 0,
-        cType or "Unknown",
         classif or "normal",
-        target,
-        -- targetedBy,
-        raidIcon,
-        tostring(isCasting),
-        -- debuffHash,
-        tostring(inCombat or false)
+        raidIcon or 0,
+        cType or "Unknown"
     )
     return pseudoID
+end
+
+-- Helper: Compares two PseudoIDs for Physical Identity
+-- Ignores volatile fields (like Current Target) if a physical match is found.
+function ScriptExtender_Scanner.IsIDCompatible(id1, id2)
+    if not id1 or not id2 then return false end
+    if id1 == id2 then return true end
+
+    -- Parsing logic (Stable across all Lua versions)
+    local function GetParts(id)
+        local p = {}
+        -- string.gfind is the Lua 5.0 equivalent of gmatch
+        for part in string.gfind(id, "([^_]+)") do
+            table.insert(p, part)
+        end
+        return p
+    end
+
+    local p1 = GetParts(id1)
+    local p2 = GetParts(id2)
+
+    -- ID Format: Name(1)_MaxHP(2)_Level(3)_Classif(4)_Icon(5)_Type(6)
+    if table.getn(p1) < 6 or table.getn(p2) < 6 then return false end
+
+    -- MATCH: Name, MaxHP, Level, Classification, and RaidIcon must match.
+    if p1[1] == p2[1] and p1[2] == p2[2] and p1[3] == p2[3] and
+        p1[4] == p2[4] and p1[5] == p2[5] then
+        return true
+    end
+
+    return false
 end
 
 -- Private Helper: Extract raw mob data from a unit token
@@ -319,11 +345,14 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
         }
     end
 
+    -- Static Context Snapshot
     ws.context = {
         playerHP = UnitHealth("player"),
         playerMaxHP = UnitHealthMax("player"),
-        playerLevel = UnitLevel("player"),
+        playerHP_Pct = (UnitHealth("player") / (UnitHealthMax("player") or 1)) * 100,
         playerMana = UnitMana("player"),
+        playerMana_Pct = (UnitMana("player") / (UnitManaMax("player") or 1)) * 100,
+        playerLevel = UnitLevel("player"),
         playerClass = class,
         playerShards = shardCount,
         playerBuffs = buffs,
@@ -334,7 +363,6 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
         initialTargetPseudoID = ScriptExtender_Scanner.GeneratePseudoID({ unit = "target" })
     }
 
-
     ---@type table<string, MobData>
     local mobAccumulator = {}
 
@@ -344,12 +372,12 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
         if not mob then return nil end
 
         -- CAPTURE identity immediately while unit exists
-        mob.pseudoID = ScriptExtender_Scanner.GeneratePseudoID({ unit = unit })
+        local pID = ScriptExtender_Scanner.GeneratePseudoID({ unit = unit })
+        mob.pseudoID = pID
+        mob.foundInRange = true -- If the scanner found it, it was in range!
 
-        -- Use a stable discovery key for deduplication ONLY
-        local discoveryKey = mob.name .. "_" .. mob.level .. "_" .. mob.maxHP
-        if not mobAccumulator[discoveryKey] then
-            mobAccumulator[discoveryKey] = mob
+        if not mobAccumulator[pID] then
+            mobAccumulator[pID] = mob
             return true
         end
         return false
@@ -370,12 +398,18 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
 
     if not ws.context.pullMode then
         local firstSeenKey = nil
+        local matchesCount = 0
         for i = 1, 26 do
             TargetNearestEnemy()
             local mob = GetRawMobData("target")
             if mob then
+                -- Robust Circle Check: Stop only after 2 identical name matches
+                -- or a perfect identity match to prevent premature exit in identical packs.
                 local dKey = mob.name .. "_" .. mob.level .. "_" .. mob.maxHP
-                if firstSeenKey and dKey == firstSeenKey then break end
+                if firstSeenKey and dKey == firstSeenKey then
+                    matchesCount = matchesCount + 1
+                    if matchesCount >= 2 then break end
+                end
                 if not firstSeenKey then firstSeenKey = dKey end
 
                 AddMobToAccumulator("target")
@@ -393,7 +427,6 @@ function ScriptExtender_Scanner.Scan(targetIsWorld)
             local _, class = UnitClass(friend)
             local classKey = string.upper(class or "")
             ws.aggregations.classCounts[classKey] = (ws.aggregations.classCounts[classKey] or 0) + 1
-            if friend ~= "player" then AddMobToAccumulator(friend .. "target") end
         end
     end
 
