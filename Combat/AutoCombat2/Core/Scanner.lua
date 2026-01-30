@@ -100,6 +100,14 @@ local function ScanDebuffs(unit)
         h = h + string.byte(hashStr, i)
     end
     data.hash = h
+
+    -- BOSS BYPASS: Elites and World Bosses are immune to player CC.
+    -- We force hasCC to false for bosses so boss mechanics (like Manacles/Ice Tomb) don't freeze the bot.
+    local classif = UnitClassification(unit)
+    if classif == "worldboss" then
+        data.hasCC = false
+    end
+
     return data
 end
 

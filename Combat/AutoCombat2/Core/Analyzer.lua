@@ -62,10 +62,20 @@ ScriptExtender_Analyzer = {
 
                             if inRange and ready then
                                 local context = casterState
-                                if isPetSpell then context = ws.context.pet end
-                                score = (spellData.score(mob, ws, context) or 0)
-                                if score <= 0 then
-                                    mobSummary.rejectedSpells[spellName] = "Score0"
+                                if isPetSpell then
+                                    if not ws.context.pet then
+                                        -- Skip pet spells if no pet exists
+                                        ready = false
+                                    else
+                                        context = ws.context.pet
+                                    end
+                                end
+
+                                if ready then
+                                    score = (spellData.score(mob, ws, context) or 0)
+                                    if score <= 0 then
+                                        mobSummary.rejectedSpells[spellName] = "Score0"
+                                    end
                                 end
                             end
                         else
@@ -119,8 +129,17 @@ ScriptExtender_Analyzer = {
 
                         if ready then
                             local context = casterState
-                            if isPetSpell then context = ws.context.pet end
-                            score = spellData.score(nil, ws, context)
+                            if isPetSpell then
+                                if not ws.context.pet then
+                                    ready = false
+                                else
+                                    context = ws.context.pet
+                                end
+                            end
+
+                            if ready then
+                                score = spellData.score(nil, ws, context)
+                            end
                         end
                     end
 

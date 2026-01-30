@@ -11,6 +11,7 @@ ScriptExtender_WarlockPetSpells = {
         target = "pet_enemy",
         isCommand = true,
         score = function(mob, ws, pet)
+            if not pet then return 0 end
             if mob.debuffs.hasCC then return 0 end -- Never break CC
 
             local score = 0
@@ -44,7 +45,7 @@ ScriptExtender_WarlockPetSpells = {
     ["Consume Shadows"] = {
         target = "pet",
         score = function(mob, ws, pet)
-            if pet.inCombat then return 0 end
+            if not pet or pet.inCombat then return 0 end
             if pet.hpPct < 70 then return 90 end
             return 0
         end,
@@ -54,6 +55,7 @@ ScriptExtender_WarlockPetSpells = {
     ["Sacrifice"] = {
         target = "player",
         score = function(mob, ws, pet)
+            if not pet then return 0 end
             local playerHP = (UnitHealth("player") / UnitHealthMax("player")) * 100
             if playerHP < 25 then return 150 end
             return 0
@@ -75,7 +77,7 @@ ScriptExtender_WarlockPetSpells = {
     ["Lash of Pain"] = {
         target = "pet_enemy",
         score = function(mob, ws, pet)
-            if mob.debuffs.hasCC then return 0 end
+            if not pet or mob.debuffs.hasCC then return 0 end
             if not pet.inCombat then return 0 end -- Must be in melee range (assumed by combat)
             if pet.manaPct > 20 then return 60 end
             return 0
@@ -97,7 +99,7 @@ ScriptExtender_WarlockPetSpells = {
     ["Firebolt"] = {
         target = "pet_enemy",
         score = function(mob, ws, pet)
-            if mob.debuffs.hasCC then return 0 end
+            if not pet or mob.debuffs.hasCC then return 0 end
             local score = 50
 
             -- Prioritize defensive targets
