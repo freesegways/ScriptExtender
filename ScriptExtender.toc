@@ -37,6 +37,7 @@ Constants\Potions.lua
 Constants\ClassSpells.lua
 Constants\BuffsAndDebuffs.lua
 Constants\Bandages.lua
+Constants\PetFood.lua
 
 Consumables\UseBestBuffFood.lua
 Consumables\UseBestBuffFood.test.lua
@@ -92,6 +93,8 @@ Classes\Warrior\AutoWarriorBuffs.lua
 Classes\Paladin\AutoPaladinBuffs.lua
 Classes\Shaman\AutoShamanBuffs.lua
 Classes\Hunter\AutoHunterBuffs.lua
+Classes\Hunter\AutoFeedPet.lua
+Classes\Hunter\AutoFeedPet.test.lua
 
 UI\MacroWindow.xml
 
