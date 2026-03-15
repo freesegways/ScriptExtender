@@ -1,11 +1,28 @@
 -- Tests for SmartCleanse Logic (Priority & Filtering)
 
+-- Shared mock setup helper
+local function SetupBasicMocks(t, opts)
+    opts = opts or {}
+    t.Mock("UnitClass", function() return "PRIEST", "PRIEST" end)
+    t.Mock("GetHealerInfo", function() return opts.healerName or "HealerBob", opts.healerID or "party1" end)
+    t.Mock("GetTankInfo",   function() return opts.tankName  or "TankDave",  opts.tankID  or "party2" end)
+    t.Mock("CheckInteractDistance", function() return true end)
+    t.Mock("UnitIsVisible",         function() return true end)
+    t.Mock("UnitExists",            function() return true end)
+    t.Mock("UnitIsConnected",       function() return true end)
+    t.Mock("UnitIsDeadOrGhost",     function() return false end)
+    t.Mock("UnitCanAssist",         function() return true end)
+    t.Mock("GetNumRaidMembers",     function() return opts.raidSize or 0 end)
+    t.Mock("CastSpellByName",       function() end)
+    t.Mock("UnitIsFriend",          function() return true end)
+    t.Mock("UnitIsUnit",            function() return false end)
+    t.Mock("UnitBuff",              function() return nil end)
+end
+
 -- 1. HEALER PRIORITY
 ScriptExtender_Tests["SmartCleanse_Priority_Healer"] = function(t)
-    local target = nil
-    t.Mock("UnitClass", function() return "PRIEST", "PRIEST" end)
-    t.Mock("GetHealerInfo", function() return "HealerBob", "party1" end)
-    t.Mock("GetTankInfo", function() return "TankDave", "party2" end)
+    local spellTargeted = nil
+    SetupBasicMocks(t)
 
     t.Mock("UnitDebuff", function(u, i)
         if i > 1 then return nil end
@@ -14,28 +31,17 @@ ScriptExtender_Tests["SmartCleanse_Priority_Healer"] = function(t)
         return nil
     end)
 
-    t.Mock("CheckInteractDistance", function() return true end)
-    t.Mock("UnitIsVisible", function() return true end)
-    t.Mock("UnitExists", function() return true end)
-    t.Mock("UnitIsConnected", function() return true end)
-    t.Mock("UnitIsDeadOrGhost", function() return false end)
-    t.Mock("UnitCanAssist", function() return true end)
-
-    t.Mock("TargetUnit", function(u) target = u end)
-    t.Mock("CastSpellByName", function(s) end)
-    t.Mock("ClearTarget", function() end)
-    t.Mock("SpellIsTargeting", function() return false end)
+    t.Mock("SpellTargetUnit", function(u) spellTargeted = u end)
+    t.Mock("UnitName", function(u) return u end)
 
     SmartCleanse()
-    t.AssertEqual({ actual = target, expected = "party1" })
+    t.AssertEqual({ actual = spellTargeted, expected = "party1" })
 end
 
 -- 2. TANK PRIORITY
 ScriptExtender_Tests["SmartCleanse_Priority_Tank"] = function(t)
-    local target = nil
-    t.Mock("UnitClass", function() return "PRIEST", "PRIEST" end)
-    t.Mock("GetHealerInfo", function() return "HealerBob", "party1" end)
-    t.Mock("GetTankInfo", function() return "TankDave", "party2" end)
+    local spellTargeted = nil
+    SetupBasicMocks(t)
 
     t.Mock("UnitDebuff", function(u, i)
         if i > 1 then return nil end
@@ -45,27 +51,18 @@ ScriptExtender_Tests["SmartCleanse_Priority_Tank"] = function(t)
         return nil
     end)
 
-    t.Mock("CheckInteractDistance", function() return true end)
-    t.Mock("UnitIsVisible", function() return true end)
-    t.Mock("UnitExists", function() return true end)
-    t.Mock("UnitIsConnected", function() return true end)
-    t.Mock("UnitIsDeadOrGhost", function() return false end)
-    t.Mock("UnitCanAssist", function() return true end)
-    t.Mock("TargetUnit", function(u) target = u end)
-    t.Mock("CastSpellByName", function(s) end)
-    t.Mock("ClearTarget", function() end)
+    t.Mock("SpellTargetUnit", function(u) spellTargeted = u end)
+    t.Mock("UnitName", function(u) return u end)
 
     SmartCleanse()
-    t.AssertEqual({ actual = target, expected = "party2" })
+    t.AssertEqual({ actual = spellTargeted, expected = "party2" })
 end
 
 -- 3. RANGE CHECK SKIP
 ScriptExtender_Tests["SmartCleanse_Skip_Range"] = function(t)
     -- Healer is Cursed but OOR. Tank is Cursed and In Range. Should Cleanse Tank.
-    local target = nil
-    t.Mock("UnitClass", function() return "PRIEST", "PRIEST" end)
-    t.Mock("GetHealerInfo", function() return "HealerBob", "party1" end)
-    t.Mock("GetTankInfo", function() return "TankDave", "party2" end)
+    local spellTargeted = nil
+    SetupBasicMocks(t)
 
     t.Mock("UnitDebuff", function(u, i)
         if i > 1 then return nil end
@@ -74,25 +71,59 @@ ScriptExtender_Tests["SmartCleanse_Skip_Range"] = function(t)
         return nil
     end)
 
-    -- Mock Range: Party1 False, Party2 True
+    -- Override: party1 is OOR
     t.Mock("CheckInteractDistance", function(u)
         if u == "party2" then return true end
         return false
     end)
     t.Mock("UnitIsVisible", function(u)
         if u == "party2" then return true end
-        return false -- Party1 invisible/oor
+        return false
     end)
-    t.Mock("UnitExists", function() return true end)
-    t.Mock("UnitIsConnected", function() return true end)
-    t.Mock("UnitIsDeadOrGhost", function() return false end)
-    t.Mock("UnitCanAssist", function() return true end)
-    t.Mock("IsActionInRange", function() return 1 end) -- For fallback check
 
-    t.Mock("TargetUnit", function(u) target = u end)
-    t.Mock("CastSpellByName", function(s) end)
-    t.Mock("ClearTarget", function() end)
+    t.Mock("SpellTargetUnit", function(u) spellTargeted = u end)
+    t.Mock("UnitName", function(u) return u end)
 
     SmartCleanse()
-    t.AssertEqual({ actual = target, expected = "party2" })
+    t.AssertEqual({ actual = spellTargeted, expected = "party2" })
+end
+
+-- 4. RAID SUPPORT: picks the right raid member
+ScriptExtender_Tests["SmartCleanse_Raid_Member"] = function(t)
+    local spellTargeted = nil
+    -- 10-man raid
+    SetupBasicMocks(t, { raidSize = 10, healerID = "raid2", tankID = "raid3" })
+
+    t.Mock("UnitDebuff", function(u, i)
+        if i > 1 then return nil end
+        -- Only raid5 has a debuff
+        if u == "raid5" then return "Interface\\Icons\\Spell_Shadow_Curse", 1, "Magic" end
+        return nil
+    end)
+
+    t.Mock("SpellTargetUnit", function(u) spellTargeted = u end)
+    t.Mock("UnitName", function(u) return u end)
+
+    SmartCleanse()
+    t.AssertEqual({ actual = spellTargeted, expected = "raid5" })
+end
+
+-- 5. NO TARGET DROP: verifies TargetUnit is never called
+ScriptExtender_Tests["SmartCleanse_NoTargetDrop"] = function(t)
+    local targetDropped = false
+    SetupBasicMocks(t)
+
+    t.Mock("UnitDebuff", function(u, i)
+        if i > 1 then return nil end
+        if u == "party1" then return "Debuff", 1, "Magic" end
+        return nil
+    end)
+
+    t.Mock("TargetUnit",      function() targetDropped = true end)
+    t.Mock("TargetLastTarget",function() targetDropped = true end)
+    t.Mock("SpellTargetUnit", function() end)
+    t.Mock("UnitName",        function(u) return u end)
+
+    SmartCleanse()
+    t.AssertEqual({ actual = targetDropped, expected = false })
 end

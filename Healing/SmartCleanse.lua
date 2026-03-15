@@ -98,38 +98,35 @@ function SmartCleanse()
     end
 
     -- 7. MAIN LOOP
-    local candidates = {"player", "party1", "party2", "party3", "party4", "target"}
-    local winner = {score=0, unit=nil, spell=nil}
-    
-    for _, u in ipairs(candidates) do
-        -- Dedup check for "target"
-        local isDuplicate = false
-        if u == "target" then
-             if UnitIsUnit("target", "player") then isDuplicate=true end
-             for j=1,4 do if UnitIsUnit("target", "party"..j) then isDuplicate=true break end end
+    -- Build candidate list: player, then party (5-man) or raid (10/25/40)
+    local candidates = {"player"}
+    local raidSize = GetNumRaidMembers and GetNumRaidMembers() or 0
+    if raidSize > 0 then
+        for i = 1, raidSize do
+            table.insert(candidates, "raid"..i)
         end
+    else
+        for i = 1, 4 do
+            table.insert(candidates, "party"..i)
+        end
+    end
 
-        if not isDuplicate then
-            local score, spell = Analyze(u)
-            if score and score > winner.score then
-                winner = {score=score, unit=u, spell=spell}
-            end
+    local winner = {score=0, unit=nil, spell=nil}
+    for _, u in ipairs(candidates) do
+        local score, spell = Analyze(u)
+        if score and score > winner.score then
+            winner = {score=score, unit=u, spell=spell}
         end
     end
 
     -- 8. EXECUTE
     if winner.unit then
-        local currentT = UnitName("target")
         local winnerName = UnitName(winner.unit)
-        
-        if currentT == winnerName then
-            CastSpellByName(winner.spell)
-        else
-            TargetUnit(winner.unit)
-            CastSpellByName(winner.spell)
-            TargetLastTarget()
-        end
-        
+
+        -- Cast then immediately provide the unit target without changing selection
+        CastSpellByName(winner.spell)
+        SpellTargetUnit(winner.unit)
+
         if winner.score >= 100 then
             DEFAULT_CHAT_FRAME:AddMessage("SmartCleanse: Removed CC from " .. winnerName)
         else
